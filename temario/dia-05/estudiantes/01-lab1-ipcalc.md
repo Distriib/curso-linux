@@ -73,3 +73,36 @@ BROADCAST=172.16.40.191
 NETWORK=172.16.40.128
 ```
 Para `.200`: `NETWORK=172.16.40.192`. **No** están en la misma red: para hablarse necesitan un gateway. Con `/26` cada red tiene solo 62 direcciones para máquinas.
+
+---
+
+# Solución — todos los comandos
+
+## Parte 1
+```bash
+sudo dnf install -y ipcalc bind-utils rsync tcpdump
+```
+
+## Parte 2
+```bash
+ls ~/empresa ~/empresa/documentos
+```
+Si falta la estructura:
+```bash
+mkdir -p ~/empresa/documentos ~/empresa/clientes ~/empresa/backups ~/empresa/logs
+touch ~/empresa/documentos/informe1.txt
+```
+
+## Parte 3
+```bash
+ipcalc -bmn 192.168.56.10/24
+ipcalc -bmn 10.0.2.15/24
+```
+La red de `192.168.56.10/24` es `192.168.56.0` y su última dirección es `192.168.56.255`.
+
+## Parte 4
+```bash
+ipcalc -bmn 172.16.40.130/26
+ipcalc -bmn 172.16.40.200/26
+```
+**No** están en la misma red: `.130` pertenece a `172.16.40.128` y `.200` a `172.16.40.192`. Con `/26` la red se corta cada 64 direcciones (0, 64, 128, 192). Dos máquinas en redes distintas no se hablan sin pasar por un gateway, aunque los tres primeros números sean iguales.
