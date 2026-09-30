@@ -11,7 +11,7 @@
 
 2. **512 MiB de swap adicional** usando un **archivo** `/swapfile`, también permanente.
 
-3. **Reiniciar** el servidor y demostrar que `/backups` volvió montado y que las tres swaps están activas. Antes de reiniciar, `sudo findmnt --verify` tiene que decir `Success`. La sesión SSH se corta: esperar un minuto y reconectar. Si no vuelve, abrir la ventana de la VM: está en modo de emergencia, y los pasos para salir están en `02-comandos`.
+3. **Reiniciar** el servidor y demostrar que `/backups` volvió montado y que las tres swaps están activas. Antes de reiniciar, `sudo findmnt --verify` tiene que decir `Success`. La sesión SSH se corta: esperar un minuto y reconectar. Si no vuelve, abrir la ventana de la VM: está en modo de emergencia, y los pasos para salir están al final del archivo `02-comandos-particiones-fstab`.
 
 4. Después del reinicio, el equipo pide **500 MiB más** en `/backups`. Ya están copiando archivos: **no se puede desmontar**. Mostrar `df -h /backups` antes y después.
 

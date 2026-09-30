@@ -1,6 +1,6 @@
-# Lab 1 — Bucles sobre un log
+# Lab 3.1 — Bucles sobre un log
 
-Vamos a fabricar un log de 10 líneas con `for` y después leerlo con bucles. Todo en `~/empresa/logs`.
+Vamos a fabricar un log de 10 líneas con `for` y después leerlo con bucles. Todo en `~/empresa/logs`. Donde dice **Ahora ustedes**, el comando no está escrito: hay que resolverlo y mandar foto. La solución está al final de la hoja.
 
 | Nivel | Usuario | Líneas | Hora |
 |---|---|---|---|
@@ -87,7 +87,7 @@ for f in ~/empresa/logs/*.log; do echo "$f: $(wc -l < "$f") líneas"; done
 /home/student/empresa/logs/app.log: 10 líneas
 /home/student/empresa/logs/servidor.log: 300 líneas
 ```
-`*.log` se convierte en la lista de archivos que terminan así. `servidor.log` es del Día 2.
+`*.log` se convierte en la lista de archivos que terminan así. `servidor.log` es el del Día 2: si ya no lo tienen, sale solo la línea de `app.log` y está bien igual.
 
 ---
 
@@ -110,6 +110,71 @@ Ahora ustedes: cambien las variables a `fecha hora nivel usuario accion` y muest
 08:22 WARN -> usuario=pedro accion=disco
 ```
 La última variable (`resto`) se queda con todo lo que sobra de la línea.
+
+```bash
+cd
+```
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — for sobre palabras
+for svc in sshd crond chronyd; do echo "$svc: $(systemctl is-active $svc)"; done
+```
+**Parte 1 (Ahora ustedes)** — los otros tres servicios:
+```bash
+for svc in firewalld atd httpd; do echo "$svc: $(systemctl is-active $svc)"; done
+```
+`firewalld` dice `active`. `httpd` y, según cómo se instaló la VM, también `atd`, van a decir `inactive` o `unknown`: todavía no están instalados. Es correcto — `at` se instala en el Lab 5.2 y `httpd` recién el Día 8.
+
+```bash
+# Parte 2 — fabricar el log
+cd ~/empresa/logs
+rm -f app.log
+for i in {1..5}; do echo "2026-09-01 08:0$i INFO usuario=ana accion=login" >> app.log; done
+```
+**Parte 2 (Ahora ustedes)** — las líneas de ERROR y de WARN:
+```bash
+for i in {1..3}; do echo "2026-09-01 08:1$i ERROR usuario=carlos accion=login" >> app.log; done
+for i in {1..2}; do echo "2026-09-01 08:2$i WARN usuario=pedro accion=disco" >> app.log; done
+cat app.log
+wc -l app.log
+```
+
+```bash
+# Parte 3 — contar
+grep -c ERROR app.log
+cut -d' ' -f3 app.log | sort | uniq -c
+```
+**Parte 3 (Ahora ustedes)** — lo mismo por usuario, que es el campo 4:
+```bash
+cut -d' ' -f4 app.log | sort | uniq -c
+```
+```
+      5 usuario=ana
+      3 usuario=carlos
+      2 usuario=pedro
+```
+Salen en orden alfabético, no por cantidad: los ordenó el `sort` antes de que `uniq` los contara.
+
+```bash
+# Parte 4 — for sobre archivos
+for f in ~/empresa/logs/*.log; do echo "$f: $(wc -l < "$f") líneas"; done
+
+# Parte 5 — while read
+while read -r fecha hora nivel resto; do
+    echo "$hora $nivel -> $resto"
+done < app.log
+```
+**Parte 5 (Ahora ustedes)** — cinco variables en vez de cuatro:
+```bash
+while read -r fecha hora nivel usuario accion; do
+    echo "$usuario tuvo $nivel"
+done < app.log
+```
+Ahora `usuario` se queda con `usuario=ana` y `accion` con `accion=login`: al haber una variable más, el reparto cambia.
 
 ```bash
 cd

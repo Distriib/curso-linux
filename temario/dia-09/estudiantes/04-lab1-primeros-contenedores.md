@@ -1,4 +1,4 @@
-# Lab — Primeros contenedores
+# Lab 4.1 — Primeros contenedores
 
 Vamos a instalar Podman, descargar dos imágenes UBI y operar un servidor web en contenedor con los comandos de todos los días.
 
@@ -6,6 +6,12 @@ Vamos a instalar Podman, descargar dos imágenes UBI y operar un servidor web en
 |---|---|
 | `registry.access.redhat.com/ubi9/ubi` | RHEL 9 pelado, para entrar y mirar |
 | `registry.access.redhat.com/ubi9/httpd-24` | Apache listo, escucha en el 8080 |
+
+> **Antes de empezar, comprobar el espacio libre:** las imágenes de este bloque ocupan cerca de 1 GB.
+> ```bash
+> df -h /
+> ```
+> Tiene que haber al menos **3 GB** libres. Si no alcanzan: `podman image prune -f` y `sudo dnf clean all`.
 
 ---
 
@@ -20,8 +26,6 @@ podman info | grep rootless
 podman info | grep graphRoot
 grep student /etc/subuid /etc/subgid
 ```
-
-Todos a la vez. Foto.
 
 **Comprobar:**
 ```
@@ -46,8 +50,6 @@ podman search registry.access.redhat.com/ubi9 --limit 5
 podman pull registry.access.redhat.com/ubi9/ubi
 podman pull registry.access.redhat.com/ubi9/httpd-24
 ```
-
-Todos a la vez. Foto.
 
 **Comprobar:**
 ```bash
@@ -88,8 +90,6 @@ exit
 podman ps -a
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 NAME="Red Hat Enterprise Linux"
@@ -115,8 +115,6 @@ podman run -d --name web -p 8080:8080 registry.access.redhat.com/ubi9/httpd-24
 podman ps
 curl -sI http://localhost:8080/ | head -3
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -157,8 +155,6 @@ podman inspect web | grep Status
 podman stats --no-stream web
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 [...] AH00489: Apache/2.4.x (Red Hat Enterprise Linux) ... configured -- resuming normal operations
@@ -188,8 +184,6 @@ podman start web
 podman ps
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:** después del `stop`, `podman ps` no lo muestra y `podman ps -a` lo muestra como `Exited (0) ... ago`. Después del `start`, `Up ... seconds`.
 
 ---
@@ -204,6 +198,100 @@ podman rm -f web80
 sudo sysctl net.ipv4.ip_unprivileged_port_start
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:** el primer comando falla con un error al reservar el puerto 80 (`permission denied` o `address already in use`). El último dice `net.ipv4.ip_unprivileged_port_start = 1024`: por debajo de ese puerto, solo root. Además, el 80 ya lo usa el Apache del servidor. La práctica: publicar arriba de 1024.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — instalar y comprobar que somos rootless
+sudo dnf install -y container-tools
+podman --version
+podman info | grep rootless
+podman info | grep graphRoot
+grep student /etc/subuid /etc/subgid
+
+# Parte 2 — registros y descarga
+grep unqualified /etc/containers/registries.conf
+podman search registry.access.redhat.com/ubi9 --limit 5
+podman pull registry.access.redhat.com/ubi9/ubi
+podman pull registry.access.redhat.com/ubi9/httpd-24
+podman images
+
+# Parte 3 — entrar a un contenedor
+podman run -it --rm registry.access.redhat.com/ubi9/ubi bash
+```
+Adentro (el prompt cambia a `[root@... /]#`):
+```
+head -2 /etc/os-release
+ps aux
+id
+exit
+```
+```bash
+podman ps -a          # no aparece: --rm lo borró al salir
+
+# Parte 4 — mirar la imagen web y lanzarla
+podman image inspect registry.access.redhat.com/ubi9/httpd-24 | grep -A 3 ExposedPorts
+podman image inspect registry.access.redhat.com/ubi9/httpd-24 | grep User
+sudo ss -tlnp | grep 8080
+podman run -d --name web -p 8080:8080 registry.access.redhat.com/ubi9/httpd-24
+podman ps
+curl -sI http://localhost:8080/ | head -3
+
+# Parte 5 — los comandos de todos los días
+podman logs web | tail -3
+podman port web
+podman top web
+podman exec -it web bash
+```
+Adentro:
+```
+id
+ls -ld /var/www/html
+httpd -v
+exit
+```
+```bash
+podman inspect web | grep Status
+podman stats --no-stream web
+
+# Parte 6 — detener y arrancar
+podman stop web
+podman ps               # no lo muestra
+podman ps -a            # Exited (0)
+podman start web
+podman ps               # Up ... seconds
+
+# Parte 7 — el límite del puerto 80
+podman run -d --name web80 -p 80:8080 registry.access.redhat.com/ubi9/httpd-24   # falla
+podman rm -f web80
+sudo sysctl net.ipv4.ip_unprivileged_port_start
+```
+
+**Rootless: el contenedor cree que es root, pero afuera es `student`.** Las líneas de `/etc/subuid` y `/etc/subgid` le reservan a `student` 65536 números de usuario. El `root` de adentro (UID 0) se traduce afuera al UID 100000. Si alguien se escapa del contenedor, sale como un usuario sin ningún privilegio — no como root de la máquina.
+
+Por eso todo se guarda en `~/.local/share/containers/storage` y no en `/var/lib/containers`, y por eso ningún `podman` de este lab lleva `sudo`.
+
+**Anatomía de `podman run`:**
+```
+podman run -d --name web -p 8080:8080 imagen
+             │      │        │    └ puerto ADENTRO del contenedor
+             │      │        └ puerto del SERVIDOR (el que se abre en el firewall)
+             │      └ nombre, para no tener que usar el ID
+             └ -d = en segundo plano · -it = interactivo · --rm = borrarlo al salir
+```
+
+**El `403` de la Parte 4 no es un error:** es la página de bienvenida de Apache, porque todavía no hay contenido nuestro. Eso llega en el Lab 4.2 con el volumen.
+
+**Los comandos de diagnóstico, comparados con lo que ya sabés:**
+
+| Contenedor | Equivalente en el servidor |
+|---|---|
+| `podman logs web` | `journalctl -u httpd` |
+| `podman top web` | `ps aux` |
+| `podman exec -it web bash` | entrar por SSH |
+| `podman stats` | `top` |
+
+**Por qué falla el puerto 80.** Dos razones a la vez: un proceso sin privilegios no puede reservar puertos por debajo de 1024 (`ip_unprivileged_port_start = 1024`), y además el 80 ya lo ocupa el Apache del servidor. La práctica normal con contenedores rootless es publicar siempre arriba de 1024.

@@ -1,6 +1,6 @@
 # Lab 3.3 — Snapshot, renombrar y borrar
 
-Vamos a sacarle una foto a `lv_datos` antes de romper algo, recuperar un archivo desde la foto, y practicar renombrar y borrar volúmenes. Todos tipean cada comando; cuando dice **Ahora ustedes**, lo hacen solos. Foto de cada parte.
+Vamos a sacarle una foto a `lv_datos` antes de romper algo, recuperar un archivo desde la foto, y practicar renombrar y borrar volúmenes. Foto de cada parte. Donde dice **Ahora ustedes**, el comando no está escrito: hay que resolverlo. La solución está al final de la hoja.
 
 ---
 
@@ -88,3 +88,42 @@ Ahora ustedes: renombrarlo a `lv_temporal`, verlo con `lvs`, borrarlo sin que pr
   vg_datos   2   1   0 wz--n- 3.99g 1.99g
 ```
 `VFree` bajó a 0 y volvió a 1.99g. Ese espacio queda para el reto.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — el snapshot
+sudo lvcreate -s -n lv_datos_snap -L 200M /dev/vg_datos/lv_datos
+sudo lvs vg_datos
+
+# Parte 2 — romper el original y comparar
+sudo rm /datos/empresa/clientes/contrato_3.txt
+echo "cambio posterior al snapshot" | sudo tee -a /datos/empresa/clientes/contrato_1.txt
+sudo mkdir -p /mnt/snap
+sudo mount -o nouuid /dev/vg_datos/lv_datos_snap /mnt/snap
+ls /mnt/snap/empresa/clientes/
+cat /mnt/snap/empresa/clientes/contrato_1.txt
+cat /datos/empresa/clientes/contrato_1.txt
+
+# Parte 3 — recuperar y soltar
+sudo cp /mnt/snap/empresa/clientes/contrato_3.txt /datos/empresa/clientes/
+ls /datos/empresa/clientes/
+sudo umount /mnt/snap
+sudo lvremove /dev/vg_datos/lv_datos_snap      # responder y
+sudo lvs vg_datos
+
+# Parte 4 — un volumen con todo lo libre
+sudo lvcreate -n lv_pruebas -l 100%FREE vg_datos
+sudo vgs vg_datos
+```
+
+**Parte 4 (Ahora ustedes)** — renombrar, ver, borrar sin que pregunte, y ver el VG:
+```bash
+sudo lvrename vg_datos lv_pruebas lv_temporal
+sudo lvs vg_datos
+sudo lvremove -y /dev/vg_datos/lv_temporal
+sudo vgs vg_datos
+```
+El snapshot de un XFS tiene el **mismo UUID** que el original: por eso se monta con `-o nouuid`. Sin esa opción, el `mount` falla.

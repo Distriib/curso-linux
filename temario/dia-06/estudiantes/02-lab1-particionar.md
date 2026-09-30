@@ -1,6 +1,6 @@
 # Lab 2.1 — Particionar `sdb` con `parted` y `sdc` con `fdisk`
 
-Vamos a dividir los dos discos nuevos. Todos tipean lo que yo tipeo; cuando dice **Ahora ustedes**, lo hacen solos y mandan foto. En UTM: `vdb` y `vdc`.
+Vamos a dividir los dos discos nuevos. Donde dice **Ahora ustedes**, el comando no está escrito: hay que resolverlo y mandar foto. La solución está al final de la hoja. En UTM: `vdb` y `vdc`.
 
 | Disco | Herramienta | Partición | De | A | Tipo |
 |---|---|---|---|---|---|
@@ -178,3 +178,66 @@ sdc      8:32   0    5G  0 disk
 └─sdc2   8:34   0    2G  0 part
 ```
 Seis particiones, ninguna con sistema de archivos todavía. Foto.
+
+---
+
+# Solución — todos los comandos
+
+## `sdb`, con `parted`
+
+```bash
+lsblk
+sudo parted /dev/sdb
+```
+Adentro de `(parted)` — las líneas marcadas son las de **Ahora ustedes**:
+```
+print
+mklabel gpt
+unit MiB
+mkpart primary xfs 1MiB 513MiB
+mkpart primary linux-swap 513MiB 1025MiB
+mkpart primary 1025MiB 2049MiB      <-- Ahora ustedes (Parte 3)
+print                                <-- Ahora ustedes (Parte 3)
+rm 3
+mkpart primary 1025MiB 3073MiB
+mkpart primary 3073MiB 100%          <-- Ahora ustedes (Parte 4)
+set 3 lvm on                         <-- Ahora ustedes (Parte 4)
+set 4 lvm on                         <-- Ahora ustedes (Parte 4)
+print                                <-- Ahora ustedes (Parte 4)
+quit                                 <-- Ahora ustedes (Parte 4)
+```
+Las flechas y el texto que les sigue **no se escriben**: son solo la marca.
+
+```bash
+sudo udevadm settle
+lsblk /dev/sdb
+sudo fdisk -l /dev/sdb
+```
+
+## `sdc`, con `fdisk`
+
+```bash
+sudo fdisk /dev/sdc
+```
+Adentro:
+```
+g
+n
+Enter
+Enter
++3G
+n
+Enter
+Enter
+Enter
+p
+w
+```
+
+## Comprobación final
+
+```bash
+sudo udevadm settle
+lsblk /dev/sdb /dev/sdc
+```
+Si `lsblk` no muestra las particiones: `sudo partprobe /dev/sdb`. En UTM, `vdb` y `vdc`.

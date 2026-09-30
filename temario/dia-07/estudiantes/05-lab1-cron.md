@@ -1,6 +1,6 @@
-# Lab 1 — `cron`
+# Lab 5.1 — `cron`
 
-Vamos a caer en la trampa del `PATH` y salir de ella, dejar el `backup.sh` programado todas las noches, y ver quién puede usar `crontab`.
+Vamos a caer en la trampa del `PATH` y salir de ella, dejar el `backup.sh` programado todas las noches, y ver quién puede usar `crontab`. Donde dice **Ahora ustedes**, el comando no está escrito: hay que resolverlo y mandar foto. La solución está al final de la hoja.
 
 | Tarea | Cuándo |
 |---|---|
@@ -98,6 +98,8 @@ MAILTO=""
 30 23 * * *        /home/student/bin/backup.sh /home/student/empresa >> /home/student/backup.log 2>&1
 */15 8-17 * * 1-5  hola.sh >> /home/student/hola.log 2>&1
 ```
+(Después del *Ahora ustedes* tienen **una línea más**, la de los lunes a las 08:00.)
+
 `crontab ARCHIVO` reemplaza **todo** el crontab anterior: las tareas de cada minuto desaparecieron.
 
 ---
@@ -152,3 +154,65 @@ See crontab(1) for more information
 no crontab for jperez
 ```
 El primer `cat` no muestra nada: el archivo existe vacío. Con `jperez` adentro, rechazo. Vacío otra vez, normal.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — cómo está cron
+systemctl is-active crond
+ls -d /etc/cron*
+crontab -l
+
+# Parte 2 — dos tareas cada minuto
+cat > ~/crontab-prueba <<'EOF'
+* * * * * date >> /home/student/cron-prueba.txt
+* * * * * hola.sh >> /home/student/cron-hola.txt 2>&1
+EOF
+crontab ~/crontab-prueba
+crontab -l
+
+# Parte 3 — esperar a que cambie el minuto, y mirar la trampa
+sudo tail -3 /var/log/cron
+cat ~/cron-prueba.txt
+cat ~/cron-hola.txt      # hola.sh: command not found
+
+# Parte 4 — el crontab definitivo
+cat > ~/mi-crontab <<'EOF'
+SHELL=/bin/bash
+PATH=/home/student/bin:/usr/local/bin:/usr/bin:/bin
+MAILTO=""
+30 23 * * *        /home/student/bin/backup.sh /home/student/empresa >> /home/student/backup.log 2>&1
+*/15 8-17 * * 1-5  hola.sh >> /home/student/hola.log 2>&1
+EOF
+crontab ~/mi-crontab
+crontab -l
+rm -f ~/cron-prueba.txt ~/cron-hola.txt ~/crontab-prueba
+```
+
+**Parte 4 (Ahora ustedes)** — agregar la tarea de los lunes a las 08:00 y reinstalar el crontab:
+```bash
+cat >> ~/mi-crontab <<'EOF'
+0 8 * * 1          /home/student/bin/revisar.sh /home/student/empresa >> /home/student/revisar.log 2>&1
+EOF
+crontab ~/mi-crontab
+crontab -l
+```
+`0 8 * * 1` = minuto 0, hora 8, cualquier día del mes, cualquier mes, día de semana 1 (lunes). Ojo con el `>>` del `cat`: con un solo `>` se borraba todo lo anterior del archivo.
+
+```bash
+# Parte 5 — el cron del sistema
+cat /etc/crontab
+cat /etc/cron.d/0hourly
+ls /etc/cron.hourly /etc/cron.daily
+
+# Parte 6 — quién puede usar crontab
+sudo chage -d "$(date +%F)" jperez
+cat /etc/cron.deny
+echo jperez | sudo tee /etc/cron.deny
+sudo -u jperez crontab -l          # rechazado
+sudo truncate -s 0 /etc/cron.deny
+sudo -u jperez crontab -l          # normal otra vez
+```
+El `chage -d` de la Parte 6 es porque `jperez` quedó del lab 4.1 con la contraseña marcada como "hay que cambiarla", y `crontab` no atiende cuentas en ese estado.

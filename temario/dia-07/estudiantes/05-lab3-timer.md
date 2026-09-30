@@ -1,6 +1,6 @@
-# Lab 3 — Temporizador de systemd
+# Lab 5.3 — Temporizador de systemd
 
-Vamos a dejar `monitor-disco.sh` corriendo cada 10 minutos, ejecutado por systemd como root.
+Vamos a dejar `monitor-disco.sh` corriendo cada 10 minutos, ejecutado por systemd como root. Donde dice **Ahora ustedes**, el comando no está escrito: hay que resolverlo y mandar foto. La solución está al final de la hoja.
 
 | Archivo | Qué |
 |---|---|
@@ -90,7 +90,7 @@ systemctl status monitor-disco.timer --no-pager | head -5
 **Comprobar:**
 ```
 Sep 16 10:06:12 rhel01 systemd[1]: Starting Monitor de uso de disco (PGN)...
-Sep 16 10:06:12 rhel01 monitor-disco.sh[6810]: Revisados 3 sistemas de archivos, 0 alerta(s)
+Sep 16 10:06:12 rhel01 monitor-disco.sh[6810]: Revisados 5 sistemas de archivos, 0 alerta(s)
 Sep 16 10:06:12 rhel01 systemd[1]: monitor-disco.service: Deactivated successfully.
 Sep 16 10:06:12 rhel01 systemd[1]: Finished Monitor de uso de disco (PGN).
 ● monitor-disco.timer - Ejecuta monitor-disco cada 10 minutos
@@ -127,3 +127,56 @@ Normalized form: *-*-* *:00/10:00
        Iter. #2: Tue 2026-09-16 10:20:00 EST
        Iter. #3: Tue 2026-09-16 10:30:00 EST
 ```
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — los temporizadores que ya trae RHEL
+systemctl list-timers --no-pager | head -5
+
+# Parte 2 — el service: QUÉ se ejecuta
+sudo tee /etc/systemd/system/monitor-disco.service <<'EOF'
+[Unit]
+Description=Monitor de uso de disco (PGN)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/monitor-disco.sh 80
+EOF
+
+# Parte 3 — el timer: CUÁNDO
+sudo tee /etc/systemd/system/monitor-disco.timer <<'EOF'
+[Unit]
+Description=Ejecuta monitor-disco cada 10 minutos
+
+[Timer]
+OnCalendar=*:0/10
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now monitor-disco.timer
+systemctl list-timers monitor-disco.timer --no-pager
+
+# Parte 4 — ejecutarlo ahora, sin esperar
+sudo systemctl start monitor-disco.service
+sudo journalctl -u monitor-disco.service -n 4 --no-pager
+systemctl status monitor-disco.timer --no-pager | head -5
+
+# Parte 5 — probar expresiones de calendario
+systemd-analyze calendar "Mon..Fri 08:00"
+systemd-analyze calendar --iterations=3 "*:0/10"
+```
+
+**Parte 5 (Ahora ustedes)** — las dos expresiones que pedía:
+```bash
+systemd-analyze calendar "Sat *-*-* 23:00"
+systemd-analyze calendar "*-*-01 03:00"
+```
+La primera normaliza a `Sat *-*-* 23:00:00`; la segunda, a `*-*-01 03:00:00`. `systemd-analyze calendar` sirve para comprobar una expresión **antes** de ponerla en un timer: si está mal escrita, da `Failed to parse`.
+
+Lo que se habilita es **el timer**, no el service: `systemctl enable --now monitor-disco.timer`. El service se ejecuta solo cuando el timer lo dispara (o a mano con `systemctl start`).

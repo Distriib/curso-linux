@@ -13,8 +13,6 @@ systemctl list-units --type=service --state=running --no-pager
 sudo ss -tulpn
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
   auditd.service        loaded active running Security Auditing Service
@@ -43,8 +41,6 @@ sudo firewall-cmd --reload
 sudo firewall-cmd --list-services
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 success
@@ -71,8 +67,6 @@ sudo systemctl enable --now dnf-automatic.timer
 systemctl list-timers dnf-automatic.timer --no-pager
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 apply_updates = yes
@@ -92,6 +86,46 @@ NEXT                        LEFT     LAST PASSED UNIT                ACTIVATES
 sudo grep COMMAND /var/log/secure | tail -3
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:** tres líneas con `student : TTY=pts/0 ; PWD=... ; USER=root ; COMMAND=/usr/bin/...`. Cada `sudo` del día: quién, desde dónde, qué comando.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — qué corre y qué escucha
+systemctl list-units --type=service --state=running --no-pager
+sudo ss -tulpn
+
+# Parte 2 — cerrar lo que nadie pidió, en las DOS zonas
+sudo firewall-cmd --permanent --remove-service=cockpit
+sudo firewall-cmd --permanent --zone=internal --remove-service=cockpit
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-services
+
+# Parte 3 — parches de seguridad solos
+sudo vim /etc/dnf/automatic.conf
+```
+Dos cambios adentro: buscar con `/apply_updates` `Enter` y dejar `apply_updates = yes`; buscar con `/upgrade_type` `Enter` y dejar `upgrade_type = security`. Guardar con `Esc` `:wq`.
+```bash
+grep apply_updates /etc/dnf/automatic.conf
+grep upgrade_type /etc/dnf/automatic.conf
+sudo systemctl enable --now dnf-automatic.timer
+systemctl list-timers dnf-automatic.timer --no-pager
+
+# Parte 4 — lo que ya queda registrado
+sudo grep COMMAND /var/log/secure | tail -3
+```
+
+**Cómo leer `ss -tulpn`.** Es la vista del atacante: cada línea `LISTEN` es una puerta.
+
+| Dirección | Qué significa |
+|---|---|
+| `0.0.0.0:22` o `*:80` | escucha en **todas** las interfaces: expuesto a la red |
+| `127.0.0.1:323` | escucha solo adentro de la máquina: no se llega desde afuera |
+
+`chronyd` en `127.0.0.1` está bien. Lo que escucha en `0.0.0.0` es lo que hay que justificar uno por uno.
+
+**Por qué `cockpit`.** Viene abierto de fábrica en el firewall aunque nadie lo haya pedido. Es el ejemplo de "puerto que venía así": si nadie lo usa, se cierra. Ojo que se cierra en **las dos zonas** — cerrarlo solo en `public` lo deja abierto para la red host-only.
+
+**`upgrade_type = security`**, no `default`: aplica solo parches de seguridad, no actualiza todo el sistema sin avisar. Y no reinicia el servidor: si un parche necesita reinicio, queda pendiente hasta que alguien lo decida.

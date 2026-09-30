@@ -1,4 +1,4 @@
-# Lab — HTTPS con certificado propio
+# Lab 1.2 — HTTPS con certificado propio
 
 Vamos a hacer que Apache también escuche en el 443, cifrado, con un certificado generado en la propia VM.
 
@@ -14,8 +14,6 @@ ls /etc/httpd/conf.d/
 grep -n Listen /etc/httpd/conf.d/ssl.conf
 grep -n localhost /etc/httpd/conf.d/ssl.conf
 ```
-
-Todos a la vez. Foto.
 
 **Comprobar:**
 ```
@@ -40,8 +38,6 @@ sudo ls -l /etc/pki/tls/certs/localhost.crt /etc/pki/tls/private/localhost.key
 sudo openssl x509 -in /etc/pki/tls/certs/localhost.crt -noout -subject -issuer -dates
 sudo ss -tlnp | grep httpd
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -73,8 +69,6 @@ sudo firewall-cmd --list-services
 sudo firewall-cmd --zone=internal --list-services
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 success
@@ -97,8 +91,6 @@ curl -k https://localhost/
 curl -k -H "Host: intranet.lab.local" https://localhost/
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 curl: (60) SSL certificate problem: self-signed certificate
@@ -118,3 +110,46 @@ El mensaje puede decir `unable to get local issuer certificate`: significa lo mi
 En el navegador de tu computadora: `https://192.168.56.10/`.
 
 **Comprobar:** el navegador avisa que la conexión no es privada o que el certificado no es confiable. Con "Continuar de todos modos" carga la página. Ese aviso es lo que ve cualquier usuario con un certificado autofirmado.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — instalar mod_ssl
+sudo dnf install -y mod_ssl
+ls /etc/httpd/conf.d/
+grep -n Listen /etc/httpd/conf.d/ssl.conf
+grep -n localhost /etc/httpd/conf.d/ssl.conf
+
+# Parte 2 — reiniciar y mirar el certificado
+sudo apachectl configtest
+sudo systemctl restart httpd
+systemctl status httpd-init --no-pager | head -3
+sudo ls -l /etc/pki/tls/certs/localhost.crt /etc/pki/tls/private/localhost.key
+sudo openssl x509 -in /etc/pki/tls/certs/localhost.crt -noout -subject -issuer -dates
+sudo ss -tlnp | grep httpd
+
+# Parte 3 — abrir el 443 en las DOS zonas
+sudo firewall-cmd --add-service=https --permanent
+sudo firewall-cmd --zone=internal --add-service=https --permanent
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-services
+sudo firewall-cmd --zone=internal --list-services
+
+# Parte 4 — probar cifrado
+curl https://localhost/            # falla: certificado autofirmado
+curl -k https://localhost/         # -k = no verifiques el certificado
+curl -k -H "Host: intranet.lab.local" https://localhost/
+
+# Parte 5 — desde el navegador de tu computadora:
+#   https://192.168.56.10/  -> aviso de certificado, y con "continuar" carga
+```
+
+**Nadie configuró el certificado.** Al instalar `mod_ssl`, un servicio de una sola ejecución (`httpd-init.service`) genera el par certificado + clave en `/etc/pki/tls/` y `ssl.conf` ya viene apuntando ahí. Por eso el HTTPS funciona con un `dnf install` y un `restart`.
+
+**Por qué `curl` se queja.** `subject` e `issuer` son iguales: el certificado se firmó a sí mismo. No hay ninguna autoridad conocida que responda por él, así que `curl` corta la conexión. El `-k` dice "seguí igual" — sirve para probar, nunca para producción. Lo que resuelve esto de verdad es un certificado emitido por una CA (interna de la organización, o pública como Let's Encrypt).
+
+**Ojo con el último `curl -k -H "Host: intranet..."`:** devuelve el **portal**, no la intranet. El virtual host de la intranet se definió solo para `*:80`; en el 443 solo existe el que trae `ssl.conf`. Para tener la intranet por HTTPS habría que agregarle su propio `<VirtualHost *:443>`.
+
+**El 443 se abre en las dos zonas**, igual que el 80: la red host-only entra por `internal` y la NAT por `public`.

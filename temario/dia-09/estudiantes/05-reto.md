@@ -1,6 +1,6 @@
 # Reto — Ticket #0931
 
-**Solos, sin ayuda.** Es tarea: se entrega por el chat antes de la próxima clase.
+**Hacelo sin mirar los labs.** Todo lo que hace falta está en los labs de hoy; si te trabás en un punto, la solución de ese paso está al final del lab correspondiente.
 
 > **Portal institucional en contenedor**
 > Solicitante: Dirección de Informática. Servidor: `rhel01`.
@@ -19,7 +19,7 @@
 
 ## Verificación
 
-Reiniciar la VM con `sudo reboot`. **Antes de entrar por SSH**, abrir `http://192.168.56.10:8085/` en el navegador y sacar una captura. Después entrar y pegar en el chat la salida completa de:
+Reiniciar la VM con `sudo reboot`. **Antes de entrar por SSH**, abrir `http://192.168.56.10:8085/` en el navegador: si carga sin que nadie haya iniciado sesión, el *linger* y el servicio están bien. Después entrar y correr:
 
 ```bash
 systemctl --user is-active portal.service
@@ -33,4 +33,4 @@ cat /remoto/portal/index.html
 mount | grep portal
 ```
 
-Está bien si: la captura muestra `Portal PGN`; el servicio está `active`; `podman ps` lista `portal` con `0.0.0.0:8085->8080/tcp`; el `curl` devuelve `Portal PGN`; `Linger=yes`; `8085/tcp` aparece en las **dos** zonas; `showmount` lista `/home/student/portal 192.168.56.0/24`; el `cat` muestra `Portal PGN`; y `mount` muestra `/home/student/portal on /remoto/portal type nfs4`.
+Está bien si: la página del navegador muestra `Portal PGN`; el servicio está `active`; `podman ps` lista `portal` con `0.0.0.0:8085->8080/tcp`; el `curl` devuelve `Portal PGN`; `Linger=yes`; `8085/tcp` aparece en las **dos** zonas; `showmount` lista `/home/student/portal 192.168.56.0/24`; el `cat` muestra `Portal PGN`; y `mount` muestra `/home/student/portal on /remoto/portal type nfs4`.

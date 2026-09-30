@@ -1,6 +1,6 @@
 # Lab 1.1 — Radiografía de los discos
 
-Todos corren cada comando en su VM; después de cada parte, la leemos juntos y foto. Hoy en este lab **no se modifica nada**. En UTM: `vda`, `vdb`, `vdc` en vez de `sda`, `sdb`, `sdc`.
+Cada uno corre los comandos en su VM y lee la salida. En este lab **no se modifica nada**: solo se mira cómo está el servidor hoy. Van todos los comandos escritos; la solución completa está igual al final de la hoja. En UTM: `vda`, `vdb`, `vdc` en vez de `sda`, `sdb`, `sdc`.
 
 ---
 
@@ -96,3 +96,26 @@ UUID=5d2f8b1a-...       /boot                   xfs     defaults        0 0
 /dev/mapper/rhel-swap   none                    swap    defaults        0 0
 ```
 Tres líneas (cuatro en UTM, con `/boot/efi`): qué, dónde, de qué tipo. `/boot` va por UUID. Hoy le agregamos cinco líneas a este archivo.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — cuántos discos hay
+lsblk
+
+# Parte 2 — dónde está / y qué hay en sda2
+lsblk -f
+
+# Parte 3 — espacio libre
+df -h
+
+# Parte 4 — ¿tienen algo escrito los discos nuevos?
+sudo blkid /dev/sdb /dev/sdc
+sudo fdisk -l /dev/sdb
+
+# Parte 5 — qué lee el sistema al arrancar
+cat /etc/fstab
+```
+En UTM, cambiar `sdb` y `sdc` por `vdb` y `vdc`.

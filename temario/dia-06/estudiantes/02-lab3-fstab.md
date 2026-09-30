@@ -1,6 +1,6 @@
 # Lab 2.3 — Montaje permanente con `/etc/fstab`
 
-Vamos a dejar `/archivos` montado en cada arranque, por UUID, y a probarlo **sin reiniciar**. Todos tipean cada comando; cuando dice **Ahora ustedes**, lo hacen solos. Foto de cada parte. `/archivos` quedó desmontado al final del lab anterior.
+Vamos a dejar `/archivos` montado en cada arranque, por UUID, y a probarlo **sin reiniciar**. Foto de cada parte. Donde dice **Ahora ustedes**, el comando no está escrito: hay que resolverlo. La solución está al final de la hoja. `/archivos` quedó desmontado al final del lab anterior.
 
 ---
 
@@ -82,3 +82,43 @@ df -h /archivos
 ```
 
 **Comprobar:** `umount` no dice nada (éxito) y `df` vuelve a mostrar `/dev/sdb1 ... /archivos`. Foto.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — el UUID
+sudo blkid -s UUID -o value /dev/sdb1
+```
+
+**Parte 2 (Ahora ustedes)** — agregar la línea a `fstab` con **su propio** UUID:
+```bash
+sudo vim /etc/fstab
+```
+`G` → `o` → pegar, reemplazando el UUID por el que dio el comando anterior:
+```
+UUID=c81e7a22-0f3d-4b6e-9a77-2d5f8c1b3e90  /archivos  xfs  defaults,nofail  0 0
+```
+`Esc` → `:wq`
+```bash
+tail -1 /etc/fstab
+```
+
+```bash
+# Parte 3 — probar sin reiniciar
+sudo systemctl daemon-reload
+sudo mount -a
+findmnt /archivos
+sudo findmnt --verify
+
+# Parte 4 — target is busy
+cd /archivos
+sudo umount /archivos          # falla: target is busy
+sudo fuser -vm /archivos
+cd ~
+sudo umount /archivos          # ahora sí
+sudo mount -a
+df -h /archivos
+```
+Si `mount -a` dice `can't find UUID=...`, el UUID está mal copiado: `blkid` de nuevo y corregirlo en `vim`. En UTM, `vdb1`.

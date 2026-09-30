@@ -9,29 +9,31 @@
 
 Hasta ayer el servidor se protegía. Hoy el servidor **publica**: cada bloque termina con un servicio al que se entra desde afuera, abierto en el firewall y con SELinux resuelto.
 
-## Cómo corre el día
+## Los laboratorios del día
 
-| Bloque | Min | Qué |
-|---|---:|---|
-| 1 | 8 | **Comandos:** Apache — cómo está armado, virtual host, HTTPS (explicado en consola) |
-| 1 | 17 | **Lab 1:** dos sitios en una IP — yo hago el primero, ustedes los demás, foto |
-| 1 | 10 | **Lab 2:** HTTPS con certificado propio — yo hago, ustedes repiten, foto |
-| 2 | 8 | **Comandos:** NFS y autofs (explicado en consola) |
-| 2 | 12 | **Lab 1:** servidor NFS — yo hago el primero, ustedes los demás, foto |
-| 2 | 10 | **Lab 2:** cliente NFS y `fstab` — yo hago el primero, ustedes los demás, foto |
-| 2 | 15 | **Lab 3:** autofs — yo hago el primero, ustedes los demás, foto |
-| 3 | 5 | **Comandos:** Samba y FTP (explicado en consola) |
-| 3 | 20 | **Lab 1:** carpeta compartida con Samba — yo hago, ustedes repiten, foto |
-| 3 | 10 | **Lab 2:** FTP enjaulado — yo hago, ustedes repiten, foto |
-| — | 15 | Descanso |
-| 4 | 10 | **Comandos:** Podman — imagen, contenedor, registro, volumen, servicio (explicado en consola) |
-| 4 | 25 | **Lab 1:** primeros contenedores — yo hago, ustedes repiten, foto |
-| 4 | 15 | **Lab 2:** volúmenes y SELinux — yo hago, ustedes repiten, foto |
-| 4 | 10 | **Lab 3:** imagen propia — yo hago, ustedes repiten, foto |
-| 4 | 20 | **Lab 4:** el contenedor como servicio — yo hago, ustedes repiten, foto |
-| — | 0 | Reto individual — queda de tarea (Ticket #0931) |
-| — | 10 | Cierre y snapshot |
-| — | 20 | Colchón (margen para imprevistos) |
+| Lab | Qué se hace |
+|---|---|
+| 1.1 | Dos sitios en una misma IP y puerto, con virtual hosts |
+| 1.2 | HTTPS con un certificado generado en la propia VM |
+| 2.1 | Servidor NFS: exportar dos carpetas con permisos distintos |
+| 2.2 | Cliente NFS: montar a mano y dejarlo en `/etc/fstab` |
+| 2.3 | autofs: que se monte solo al entrar y se suelte solo al dejar de usarlo |
+| 3.1 | Carpeta compartida con Samba, abierta desde Linux y desde Windows |
+| 3.2 | FTP con cada usuario enjaulado en su propia carpeta |
+| 4.1 | Primeros contenedores con Podman: imágenes, `run`, `exec`, `logs` |
+| 4.2 | Volúmenes: servir una carpeta del servidor, y el `:Z` de SELinux |
+| 4.3 | Construir una imagen propia con un `Containerfile` |
+| 4.4 | El contenedor como servicio, que arranca solo con la máquina |
+
+Cada lab termina con una sección **Solución** con todos los comandos seguidos.
+
+**Reto del día:** Ticket #0931 — el portal en contenedor, arrancando solo, exportado por NFS y montado con autofs.
+
+## Antes de empezar
+
+El Día 9 arranca con el servidor tal como lo dejó la tarea del Día 8: Apache en el puerto 80 sirviendo `/var/www/html`. Si `curl http://localhost/` no devuelve la página, el Lab 1.1 Parte 1 explica cómo arreglarlo antes de seguir.
+
+Hace falta **espacio en disco**: las imágenes de contenedor del Bloque 4 ocupan cerca de 1 GB. Comprobar con `df -h /` que haya al menos 3 GB libres; si no, `podman image prune -f` y `sudo dnf clean all`.
 
 ---
 
@@ -41,8 +43,8 @@ Publicar un sitio web, una carpeta NFS y una carpeta Samba con el firewall y SEL
 
 ---
 
-## Tarea
+## Para cerrar el día
 
-1. **Snapshot `dia09-fin`** con la VM apagada, después de comprobar que tras el reinicio los contenedores están arriba y `ls /remoto/compartido` funciona. **No borrar** contenedores, mapas de autofs ni carpetas compartidas: el Día 10 se rompen a propósito para arreglarlos.
-2. **El reto** (Ticket #0931). Mandar por el chat la salida del bloque de Verificación y la captura del navegador.
-3. **Espacio en disco:** `df -h /` tiene que mostrar al menos 3G libres (las imágenes ocupan cerca de 1G). Si no: `podman image prune -f` y `sudo dnf clean all`.
+1. **El reto** (Ticket #0931), que junta el contenedor, NFS y autofs en un solo ejercicio.
+2. **Snapshot `dia09-fin`** con la VM apagada, después de comprobar que tras el reinicio los contenedores están arriba y `ls /remoto/compartido` funciona.
+3. **Espacio en disco:** `df -h /` tiene que mostrar al menos 3G libres. Si no: `podman image prune -f` y `sudo dnf clean all`.

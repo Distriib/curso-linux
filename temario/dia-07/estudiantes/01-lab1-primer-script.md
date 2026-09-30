@@ -1,6 +1,6 @@
-# Lab — Primer script
+# Lab 1.1 — Primer script
 
-Vamos a dejar tres scripts en `~/bin` y ejecutarlos por nombre desde cualquier carpeta.
+Vamos a dejar tres scripts en `~/bin` y ejecutarlos por nombre desde cualquier carpeta. Donde dice **Ahora ustedes**, el comando no está escrito: hay que resolverlo y mandar foto. La solución está al final de la hoja.
 
 | Script | Qué hace |
 |---|---|
@@ -162,4 +162,91 @@ Fecha:        2026-09-... ..:..:..
 Kernel:       5.14.0-...
 Encendido:    up ...
 Disco raíz:   /dev/mapper/rhel-root  17G  ...  ...  ...% /
+```
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — carpetas
+mkdir -p ~/bin ~/empresa/logs
+sudo mkdir -p /datos/backups
+sudo chown student:student /datos/backups
+echo "$PATH"
+
+# Parte 2 — hola.sh
+cat > ~/bin/hola.sh <<'EOF'
+#!/bin/bash
+# hola.sh - primer script: variables, comillas y $( )
+NOMBRE="Procuraduria"
+FECHA=$(date +%F)
+
+echo "Hola, $NOMBRE. Hoy es $FECHA"
+echo 'Con comillas simples no se reemplaza: $NOMBRE'
+echo "Archivo de salida: ${NOMBRE}_reporte.txt"
+echo "Cuenta: $((7 * 6))"
+EOF
+ls -l ~/bin/hola.sh
+bash ~/bin/hola.sh
+
+# Parte 3 — permiso de ejecución y PATH
+cd ~/bin
+./hola.sh            # Permission denied
+chmod +x hola.sh
+./hola.sh
+cd /tmp
+hola.sh              # funciona: ~/bin está en el PATH
+cd
+
+# Parte 4 — args.sh
+cat > ~/bin/args.sh <<'EOF'
+#!/bin/bash
+# args.sh - muestra lo que recibe
+echo "Nombre del script: $0"
+echo "Primer argumento:  $1"
+echo "Segundo argumento: $2"
+echo "Cantidad:          $#"
+echo "Todos:             $@"
+EOF
+chmod +x ~/bin/args.sh
+args.sh servidor01 "Sala de servidores" 42
+```
+
+**Parte 4 (Ahora ustedes)** — con su nombre, su área entre comillas y un número; después lo mismo **sin** comillas:
+```bash
+args.sh esteban "Sala de servidores" 7
+args.sh esteban Sala de servidores 7
+```
+Con comillas, `Cantidad: 3`. Sin comillas, `Cantidad: 5`: cada palabra pasó a ser un argumento aparte.
+
+```bash
+# Parte 5 — el código de salida
+ls /etc/hostname; echo "código: $?"
+ls /nada; echo "código: $?"
+
+# Parte 6 — reporte.sh
+cat > ~/bin/reporte.sh <<'EOF'
+#!/bin/bash
+# reporte.sh - reporte breve del servidor
+read -p "Nombre del técnico: " TECNICO
+echo "=== Reporte de $(hostname) ==="
+echo "Generado por: $TECNICO"
+echo "Fecha:        $(date '+%F %T')"
+echo "Kernel:       $(uname -r)"
+echo "Encendido:    $(uptime -p)"
+echo "Disco raíz:   $(df -h / | tail -1)"
+EOF
+chmod +x ~/bin/reporte.sh
+reporte.sh
+```
+
+**Parte 6 (Ahora ustedes)** — agregar la línea de conectados. Con `vim ~/bin/reporte.sh`: `G` → `o` → pegar la línea → `Esc` → `:wq`
+```
+echo "Conectados:   $(who | wc -l)"
+```
+O sin abrir el editor (las comillas simples de afuera evitan que se ejecute ahora):
+```bash
+echo 'echo "Conectados:   $(who | wc -l)"' >> ~/bin/reporte.sh
+reporte.sh
 ```

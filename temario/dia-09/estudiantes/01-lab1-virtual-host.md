@@ -1,4 +1,4 @@
-# Lab — Dos sitios en una IP
+# Lab 1.1 — Dos sitios en una IP
 
 Vamos a confirmar que Apache quedó en el puerto 80, y a publicar un segundo sitio, `intranet`, en la misma IP y el mismo puerto.
 
@@ -19,8 +19,6 @@ sudo apachectl -S
 curl http://localhost/
 sudo firewall-cmd --get-active-zones
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -62,8 +60,6 @@ Pegar (`i`, pegar, `Esc`, `:wq`):
 </VirtualHost>
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```bash
 sudo apachectl configtest
@@ -84,7 +80,7 @@ echo "<h1>Intranet PGN - rhel01</h1>" | sudo tee /var/www/intranet/index.html
 echo "Documento 1 de la intranet" | sudo tee /var/www/intranet/descargas/doc1.txt
 ```
 
-Ahora ustedes: `doc2.txt` y `doc3.txt`, con `Documento 2` y `Documento 3`. Foto.
+Hacer lo mismo con `doc2.txt` y `doc3.txt`, con `Documento 2` y `Documento 3` adentro.
 
 **Comprobar:**
 ```bash
@@ -126,8 +122,6 @@ sudo systemctl reload httpd
 sudo apachectl -S
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 Syntax OK
@@ -149,8 +143,6 @@ curl http://localhost/
 curl -H "Host: intranet.lab.local" http://localhost/
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 <h1>Portal institucional - version 2</h1>
@@ -170,7 +162,7 @@ curl -s http://intranet.lab.local/descargas/ | grep txt
 curl http://intranet.lab.local/descargas/doc2.txt
 ```
 
-Ahora ustedes: lo mismo, pidiendo `doc3.txt`. Foto.
+Repetir el último `curl` pidiendo `doc3.txt`.
 
 **Comprobar:**
 ```
@@ -192,10 +184,87 @@ La lista de archivos la arma Apache solo, por `Options Indexes`.
 sudo tail -3 /var/log/httpd/intranet-access_log
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 127.0.0.1 - - [...] "GET /descargas/ HTTP/1.1" 200 ...
 127.0.0.1 - - [...] "GET /descargas/doc2.txt HTTP/1.1" 200 ...
 ```
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — cómo quedó Apache
+sudo ss -tlnp | grep httpd
+sudo apachectl -S
+curl http://localhost/
+sudo firewall-cmd --get-active-zones
+
+# Parte 2 — el sitio por defecto, con nombre
+sudo vim /etc/httpd/conf.d/00-default.conf
+```
+Contenido (`i`, pegar, `Esc`, `:wq`):
+```
+<VirtualHost *:80>
+    ServerName rhel01
+    DocumentRoot /var/www/html
+</VirtualHost>
+```
+```bash
+sudo apachectl configtest
+
+# Parte 3 — el contenido de la intranet
+sudo mkdir -p /var/www/intranet/descargas
+echo "<h1>Intranet PGN - rhel01</h1>" | sudo tee /var/www/intranet/index.html
+echo "Documento 1 de la intranet" | sudo tee /var/www/intranet/descargas/doc1.txt
+echo "Documento 2 de la intranet" | sudo tee /var/www/intranet/descargas/doc2.txt
+echo "Documento 3 de la intranet" | sudo tee /var/www/intranet/descargas/doc3.txt
+ls /var/www/intranet/descargas
+ls -Z /var/www/intranet
+
+# Parte 4 — el virtual host
+sudo vim /etc/httpd/conf.d/intranet.conf
+```
+Contenido:
+```
+<VirtualHost *:80>
+    ServerName intranet.lab.local
+    ServerAlias intranet
+    DocumentRoot /var/www/intranet
+    ErrorLog logs/intranet-error_log
+    CustomLog logs/intranet-access_log combined
+    <Directory /var/www/intranet>
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+</VirtualHost>
+```
+```bash
+sudo apachectl configtest
+sudo systemctl reload httpd
+sudo apachectl -S
+
+# Parte 5 — misma IP, mismo puerto, distinto sitio
+curl http://localhost/
+curl -H "Host: intranet.lab.local" http://localhost/
+
+# Parte 6 — con nombre de verdad
+echo "127.0.0.1 intranet.lab.local intranet" | sudo tee -a /etc/hosts
+curl http://intranet.lab.local/
+curl -s http://intranet.lab.local/descargas/ | grep txt
+curl http://intranet.lab.local/descargas/doc2.txt
+curl http://intranet.lab.local/descargas/doc3.txt
+
+# Parte 7 — cada sitio con su log
+sudo tail -3 /var/log/httpd/intranet-access_log
+```
+
+**Cómo elige Apache el sitio.** Dos sitios comparten la misma IP y el mismo puerto 80. Lo que los distingue es la cabecera `Host:` que manda el navegador. Por eso `curl http://localhost/` da el portal y `curl -H "Host: intranet.lab.local" http://localhost/` da la intranet: es el mismo servidor, el mismo puerto, y solo cambió el nombre pedido.
+
+**Por qué hace falta `00-default.conf`.** Si hay virtual hosts y ninguno coincide con el nombre pedido, Apache responde con **el primero que leyó** — y los archivos de `conf.d/` se leen en orden alfabético. El `00-` adelante garantiza que el sitio por defecto sea el portal y no la intranet.
+
+**No hizo falta tocar SELinux** en todo el lab: `/var/www/intranet` está dentro de `/var/www`, que la política ya tiene en su tabla como `httpd_sys_content_t`. Una carpeta fuera de ahí (como el `/web` del Día 8) sí habría necesitado `semanage fcontext`.
+
+**`/etc/hosts` en vez de DNS:** la línea que se agrega hace que `intranet.lab.local` resuelva a `127.0.0.1` solo en esta VM. En producción ese nombre lo publicaría el servidor DNS.

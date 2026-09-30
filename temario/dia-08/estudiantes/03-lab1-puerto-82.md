@@ -14,8 +14,6 @@ sudo semanage port -l | grep -w http_port_t
 sudo semanage port -l | grep 8080
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 Stopping logging:                                          [  OK  ]
@@ -37,8 +35,6 @@ sudo systemctl restart httpd
 sudo ausearch -m AVC -ts recent | tail -1
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 Job for httpd.service failed ...
@@ -59,8 +55,6 @@ sudo systemctl restart httpd
 curl http://localhost:82
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 http_port_t                    tcp      82, 80, 81, 443, 488, 8008, 8009, 8443, 9000
@@ -77,8 +71,6 @@ http_port_t                    tcp      82, 80, 81, 443, 488, 8008, 8009, 8443, 
 sudo semanage port -l -C
 sudo semanage port -a -t http_port_t -p tcp 8080
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -103,7 +95,7 @@ sudo firewall-cmd --list-ports
 sudo firewall-cmd --zone=internal --list-ports
 ```
 
-Ahora ustedes: lo mismo, y en el navegador de su computadora `http://192.168.56.10:82`. Foto.
+Y en el navegador de su computadora, `http://192.168.56.10:82`.
 
 **Comprobar:**
 ```
@@ -114,3 +106,45 @@ success
 82/tcp
 ```
 Y la página carga en el 82 desde tu computadora.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — qué puertos conoce SELinux
+sudo service auditd restart
+sudo semanage port -l | grep -w http_port_t
+sudo semanage port -l | grep 8080
+
+# Parte 2 — reproducir el fallo y leer el AVC
+echo "Listen 82" | sudo tee /etc/httpd/conf.d/puerto.conf
+sudo systemctl restart httpd          # falla
+sudo ausearch -m AVC -ts recent | tail -1
+
+# Parte 3 — registrar el puerto
+sudo semanage port -a -t http_port_t -p tcp 82
+sudo semanage port -l | grep -w http_port_t
+sudo systemctl restart httpd          # ahora arranca
+curl http://localhost:82
+
+# Parte 4 — lo tuyo, y un puerto que ya tiene dueño
+sudo semanage port -l -C              # solo lo que agregaste vos
+sudo semanage port -a -t http_port_t -p tcp 8080    # ValueError: already defined
+
+# Parte 5 — abrirlo en el firewall, en las DOS zonas
+sudo firewall-cmd --permanent --add-port=82/tcp
+sudo firewall-cmd --permanent --zone=internal --add-port=82/tcp
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-ports
+sudo firewall-cmd --zone=internal --list-ports
+```
+
+**Los dos porteros.** Para publicar un puerto no estándar hacen falta las dos cosas, y fallan con síntomas distintos:
+
+| Falta | Síntoma |
+|---|---|
+| `semanage port` | Apache **no arranca**: `Permission denied ... make_sock` |
+| `firewall-cmd` | Apache arranca y `curl http://localhost:82` **desde la VM** funciona, pero desde tu computadora no carga |
+
+**`-a` contra `-m`:** `-a` agrega un puerto que no tiene dueño; si ya lo tiene, da `ValueError: Port tcp/NNNN already defined` y hay que usar `-m` para reasignarlo. Esto vuelve en el reto.

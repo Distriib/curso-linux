@@ -1,6 +1,6 @@
 # Lab 2.2 — Formatear, etiquetar y montar a mano
 
-Vamos a darle un sistema de archivos a `sdb1`, etiquetarlo `ARCHIVOS`, montarlo en `/archivos`, y ver qué pasa al formatear de nuevo. Todos tipean cada comando; cuando dice **Ahora ustedes**, lo hacen solos. Foto de cada parte. En UTM: `vdb1`.
+Vamos a darle un sistema de archivos a `sdb1`, etiquetarlo `ARCHIVOS`, montarlo en `/archivos`, y ver qué pasa al formatear de nuevo. Foto de cada parte. Donde dice **Ahora ustedes**, el comando no está escrito: hay que resolverlo. La solución está al final de la hoja. En UTM: `vdb1`.
 
 ---
 
@@ -116,3 +116,55 @@ mkfs.xfs: Use the -f option to force overwrite.
 /dev/sdb1: LABEL="ARCHIVOS" UUID="c81e7a22-..." TYPE="xfs" ...
 ```
 `mkfs.xfs` no pregunta: se niega, y hay que forzar con `-f`. Otro UUID nuevo: **este** es el que va a `fstab`. Queda **desmontado** para el siguiente lab. Foto.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — crear XFS
+sudo mkfs.xfs /dev/sdb1
+
+# Parte 2 — firma y etiqueta
+sudo blkid /dev/sdb1
+sudo xfs_admin -L ARCHIVOS /dev/sdb1
+sudo blkid /dev/sdb1
+
+# Parte 3 — montar
+sudo mkdir /archivos
+sudo mount /dev/sdb1 /archivos
+findmnt /archivos
+df -h /archivos
+
+# Parte 4 — los datos viven en el sistema de archivos, no en la carpeta
+echo "hola desde sdb1" | sudo tee /archivos/nota.txt
+ls -l /archivos
+sudo umount /archivos
+ls -l /archivos
+sudo mount /dev/sdb1 /archivos
+ls -l /archivos
+```
+
+**Ahora ustedes (Parte 4)** — lo mismo con una nota propia, poniendo su nombre en vez de `ana`:
+```bash
+echo "nota de ana" | sudo tee /archivos/ana.txt
+ls -l /archivos
+sudo umount /archivos
+ls -l /archivos
+sudo mount /dev/sdb1 /archivos
+ls -l /archivos
+```
+
+```bash
+# Parte 5 — pasar a ext4
+sudo umount /archivos
+sudo mkfs.ext4 /dev/sdb1          # responder y
+sudo e2label /dev/sdb1 ARCHIVOS
+sudo blkid /dev/sdb1
+
+# Parte 6 — volver a XFS
+sudo mkfs.xfs /dev/sdb1           # se niega
+sudo mkfs.xfs -f -L ARCHIVOS /dev/sdb1
+sudo blkid /dev/sdb1
+```
+Queda desmontado. En UTM, `vdb1`.

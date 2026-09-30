@@ -1,6 +1,6 @@
 # Reto — Ticket PGN-2026-0812
 
-**Solos, sin ayuda.** Si no se termina en clase, queda de tarea.
+**Hacelo sin mirar los labs.** Todo lo que hace falta lo viste hoy; si te trabás, la solución de cada paso está en el lab correspondiente.
 
 > **Portal institucional: nuevo puerto y nueva carpeta**
 > Prioridad ALTA. Solicitante: Dirección de Informática. Servidor: `rhel01`.
@@ -22,7 +22,7 @@
 
 ## Verificación
 
-Pegar en el chat la salida completa de:
+Cuando creas que está listo, correr esto y revisar la salida:
 
 ```bash
 getenforce

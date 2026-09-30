@@ -15,8 +15,6 @@ ls -Zd /web
 ls -Z /web
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 unconfined_u:object_r:default_t:s0 /web
@@ -47,8 +45,6 @@ sudo systemctl restart httpd
 curl -I http://localhost:82
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 Syntax OK
@@ -66,8 +62,6 @@ La configuración es correcta, la carpeta es `755`, el archivo `644`… y 403.
 ```bash
 sudo ausearch -m AVC -ts recent | tail -1
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -87,8 +81,6 @@ curl -I http://localhost:82
 sudo restorecon -Rv /web
 curl -I http://localhost:82
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -115,8 +107,6 @@ ls -Z /web
 curl http://localhost:82
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 SELinux fcontext                                   type               Context
@@ -128,3 +118,52 @@ unconfined_u:object_r:httpd_sys_content_t:s0 index.html
 <h1>Portal institucional - servido desde /web</h1>
 ```
 Ahora `restorecon` **confirma** la etiqueta en vez de deshacerla.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — la carpeta nueva y su etiqueta
+sudo mkdir /web
+echo "<h1>Portal institucional - servido desde /web</h1>" | sudo tee /web/index.html
+ls -Zd /web          # default_t
+ls -Z /web
+
+# Parte 2 — apuntar Apache a /web
+sudo vim /etc/httpd/conf.d/web.conf
+```
+Contenido del archivo (`Esc` `:wq` para guardar):
+```
+DocumentRoot "/web"
+<Directory "/web">
+    Require all granted
+</Directory>
+```
+```bash
+sudo apachectl configtest        # Syntax OK
+sudo systemctl restart httpd
+curl -I http://localhost:82      # 403 Forbidden
+
+# Parte 3 — confirmar con el AVC
+sudo ausearch -m AVC -ts recent | tail -1
+
+# Parte 4 — la tentación: chcon
+sudo chcon -R -t httpd_sys_content_t /web
+curl -I http://localhost:82      # 200 OK ... pero:
+sudo restorecon -Rv /web         # lo DESHACE
+curl -I http://localhost:82      # 403 otra vez
+
+# Parte 5 — la solución: regla + aplicar
+sudo semanage fcontext -a -t httpd_sys_content_t "/web(/.*)?"
+sudo semanage fcontext -l -C
+sudo restorecon -Rv /web
+ls -Z /web
+curl http://localhost:82
+```
+
+**Siempre dos pasos.** `semanage fcontext -a` escribe la regla en la tabla **ruta → tipo**, pero no toca ningún archivo; `restorecon -Rv` aplica esa tabla a lo que ya existe. Sin el segundo, la carpeta sigue mal etiquetada; sin el primero, el arreglo se deshace solo.
+
+**Por qué `chcon` no sirve:** cambia la etiqueta del archivo sin tocar la tabla. El próximo `restorecon` —una actualización, un reetiquetado nocturno, o un compañero aplicado— la vuelve a poner como dice la tabla, y la web se cae. `chcon` solo para probar una hipótesis en el momento.
+
+La comilla y el `(/.*)?` de `"/web(/.*)?"` significan "esta carpeta y todo lo que tenga adentro". Se escribe siempre así, entre comillas.

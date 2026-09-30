@@ -10,28 +10,23 @@
 
 Hasta ayer el servidor era el que salió de la instalación: un disco, y listo. Hoy le agregamos discos, los repartimos y los hacemos crecer sin apagarlo.
 
-## Cómo corre el día
+## Los laboratorios del día
 
-| Bloque | Min | Qué |
-|---|---:|---|
-| 1 | 15 | **Comandos:** disco → partición → sistema de archivos → punto de montaje; GPT, XFS, UUID, qué es LVM (explicado en consola) |
-| 1 | 10 | **Lab 1.1:** radiografía de los discos — guiado: todos tipean, después leemos la salida; acá se confirma que están los dos discos nuevos |
-| 2 | 10 | **Comandos:** `parted`, `fdisk`, `mkfs`, `mount`, `/etc/fstab` y swap (explicado en consola) |
-| 2 | 20 | **Lab 2.1:** particionar `sdb` y `sdc` — yo hago las dos primeras particiones, ustedes las otras dos, foto |
-| 2 | 15 | **Lab 2.2:** formatear, etiquetar y montar a mano — guiado: todos tipean, foto de cada parte |
-| 2 | 15 | **Lab 2.3:** montaje permanente con `/etc/fstab` — yo hago el primero, ustedes lo repiten con su UUID, foto |
-| 2 | 10 | **Lab 2.4:** swap en partición — yo hago el primero, ustedes lo repiten con su UUID, foto |
-| — | 15 | Descanso |
-| 3 | 10 | **Comandos:** LVM — PV, VG, LV y cómo se amplían (explicado en consola) |
-| 3 | 20 | **Lab 3.1:** crear un volumen LVM y montarlo — yo hago el primer contrato, ustedes los demás, foto |
-| 3 | 15 | **Lab 3.2:** ampliar en caliente — guiado: todos tipean, foto de cada parte |
-| 3 | 10 | **Lab 3.3:** snapshot, renombrar y borrar — yo hago el primero, ustedes el resto, foto |
-| 4 | 5 | **Comandos:** Stratis (explicado en consola) |
-| 4 | 25 | **Lab 4.1:** pool Stratis con snapshot y ampliación — yo hago el primero, ustedes lo repiten con su UUID, foto |
-| 5 | 10 | **Comandos:** automontaje y VDO — qué son y cuándo se usan (explicado en consola) |
-| — | 0 | Reto individual — queda de tarea si no alcanza el reloj |
-| — | 10 | Cierre y snapshot |
-| — | 25 | Colchón (margen para imprevistos) |
+| Lab | Qué se hace |
+|---|---|
+| 1.1 | Radiografía de los discos: cuántos hay, qué tiene cada uno, qué está montado |
+| 2.1 | Particionar `sdb` con `parted` y `sdc` con `fdisk` |
+| 2.2 | Formatear, etiquetar y montar a mano |
+| 2.3 | Montaje permanente con `/etc/fstab` |
+| 2.4 | Swap en partición |
+| 3.1 | Crear un volumen LVM y montarlo |
+| 3.2 | Ampliar en caliente, sin desmontar nada |
+| 3.3 | Snapshot, renombrar y borrar volúmenes |
+| 4.1 | Un pool Stratis con snapshot y ampliación |
+
+Cada lab termina con una sección **Solución** con todos los comandos. Mirarla después de intentarlo.
+
+**Reto del día:** Ticket #2026-0614 — volumen de respaldos permanente, ampliado en caliente, más un archivo de swap.
 
 ---
 

@@ -6,14 +6,7 @@
 
 ---
 
-## El ticket
-
-> **De:** Dirección de Informática
-> **Para:** Administración de servidores
->
-> Se crea el área de **Archivo Digital**. Necesitamos en el servidor `rhel01`:
-
----
+## Tareas
 
 ### 1. El grupo y la persona
 

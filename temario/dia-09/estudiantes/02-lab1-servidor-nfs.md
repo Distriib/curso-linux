@@ -1,4 +1,4 @@
-# Lab — Servidor NFS
+# Lab 2.1 — Servidor NFS
 
 Vamos a exportar dos carpetas: una con escritura para la red host-only y otra de solo lectura para la propia VM.
 
@@ -20,8 +20,6 @@ systemctl status nfs-server --no-pager | head -4
 sudo ss -tln | grep 2049
 ```
 
-Todos a la vez. Foto.
-
 **Comprobar:**
 ```
 ● nfs-server.service - NFS server and services
@@ -41,7 +39,7 @@ sudo mkdir -p /srv/nfs/compartido
 sudo chown student:student /srv/nfs/compartido
 ```
 
-Ahora ustedes: la de solo lectura, `/srv/nfs/lectura`, de root, con un archivo `README.txt` que diga `Solo lectura desde NFS - rhel01` (con `sudo tee`). Foto.
+Ahora la segunda carpeta: `/srv/nfs/lectura`, de root, con un archivo `README.txt` que diga `Solo lectura desde NFS - rhel01` (con `sudo tee`).
 
 **Comprobar:**
 ```bash
@@ -73,8 +71,6 @@ sudo exportfs -rav
 sudo exportfs -v
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 exporting 192.168.56.0/24:/srv/nfs/compartido
@@ -99,8 +95,6 @@ sudo firewall-cmd --zone=internal --list-services
 showmount -e localhost
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 success
@@ -123,8 +117,6 @@ Export list for localhost:
 getsebool nfs_export_all_ro nfs_export_all_rw use_nfs_home_dirs
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 nfs_export_all_ro --> on
@@ -132,3 +124,68 @@ nfs_export_all_rw --> on
 use_nfs_home_dirs --> off
 ```
 Los dos primeros vienen encendidos: el servidor puede exportar cualquier carpeta.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — instalar y arrancar
+sudo dnf install -y nfs-utils
+sudo systemctl enable --now nfs-server
+systemctl status nfs-server --no-pager | head -4
+sudo ss -tln | grep 2049
+
+# Parte 2 — las dos carpetas
+sudo mkdir -p /srv/nfs/compartido
+sudo chown student:student /srv/nfs/compartido
+sudo mkdir -p /srv/nfs/lectura
+echo "Solo lectura desde NFS - rhel01" | sudo tee /srv/nfs/lectura/README.txt
+ls -ld /srv/nfs/*
+cat /srv/nfs/lectura/README.txt
+
+# Parte 3 — /etc/exports
+sudo vim /etc/exports
+```
+Contenido (**sin espacio antes del paréntesis**):
+```
+/srv/nfs/compartido    192.168.56.0/24(rw,sync,no_root_squash)
+/srv/nfs/lectura       127.0.0.1(ro,sync)
+```
+```bash
+sudo exportfs -rav
+sudo exportfs -v
+
+# Parte 4 — firewall (TRES servicios) y comprobación
+sudo firewall-cmd --permanent --add-service=nfs --add-service=rpc-bind --add-service=mountd
+sudo firewall-cmd --permanent --zone=internal --add-service=nfs --add-service=rpc-bind --add-service=mountd
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-services
+sudo firewall-cmd --zone=internal --list-services
+showmount -e localhost
+
+# Parte 5 — SELinux ya lo permite
+getsebool nfs_export_all_ro nfs_export_all_rw use_nfs_home_dirs
+```
+
+**Anatomía de una línea de `/etc/exports`:**
+```
+/srv/nfs/compartido    192.168.56.0/24(rw,sync,no_root_squash)
+        │                    │          └ opciones, SIN espacio antes del paréntesis
+        │                    └ para quién: una red, una IP, o un nombre
+        └ qué carpeta se exporta
+```
+Un espacio antes del `(` cambia el significado: pasaría a exportarse para **todo el mundo** con las opciones por defecto. Es el error clásico.
+
+| Opción | Qué hace |
+|---|---|
+| `rw` / `ro` | escritura / solo lectura — **manda el servidor**, no el cliente |
+| `sync` | confirma la escritura recién cuando está en disco |
+| `no_root_squash` | el root del cliente sigue siendo root en el servidor (peligroso; solo entre servidores de confianza) |
+| `root_squash` (por defecto) | el root del cliente se convierte en `nobody` |
+
+**`active (exited)` no es un error.** El servidor NFS vive en el kernel; la unidad de systemd solo lo prepara y termina. Lo que confirma que está arriba es `ss -tln | grep 2049`.
+
+**Tres servicios en el firewall, no uno:** `nfs` (2049), `rpc-bind` (111) y `mountd`. Con solo `nfs` abierto, el cliente se queda colgado al montar.
+
+**No hizo falta tocar SELinux** porque `nfs_export_all_ro` y `nfs_export_all_rw` vienen encendidos de fábrica.

@@ -9,29 +9,34 @@
 
 Hasta ayer la pregunta era "cómo hago que el servidor haga X". Hoy es "cómo hago que **no** pueda hacer nada más que X, aunque lo ataquen".
 
-## Cómo corre el día
+## Los laboratorios del día
 
-| Bloque | Min | Qué |
-|---|---:|---|
-| 1 | 15 | **Comandos:** firewalld — zonas, servicios, runtime vs permanent (explicado en consola) |
-| 1 | 25 | **Lab 1.1:** publicar Apache a través del firewall — todos tipean, después leemos la salida; foto |
-| 1 | 20 | **Lab 1.2:** la red de administración en su zona, y un Apache que no arranca — todos tipean; foto |
-| 2 | 15 | **Comandos:** SELinux — modos, contextos, tipos (explicado en consola) |
-| 2 | 10 | **Lab 2.1:** modos y contextos — probar permissive y volver; foto |
-| 2 | 10 | **Lab 2.2:** el clásico: mv, 403 y restorecon; foto |
-| — | 15 | Descanso |
-| 3 | 10 | **Comandos:** semanage — puertos, carpetas, booleanos; leer un AVC (explicado en consola) |
-| 3 | 10 | **Lab 3.1:** Apache en el puerto 82; foto |
-| 3 | 15 | **Lab 3.2:** la web desde una carpeta propia; foto |
-| 3 | 5 | **Lab 3.3:** booleanos; foto |
-| 3 | 15 | **Lab 3.4:** leer una denegación de punta a punta; foto |
-| 4 | 5 | **Comandos:** hardening — cuatro frentes (explicado en consola) |
-| 4 | 15 | **Lab 4.1:** SSH solo con llaves, sin root, probado antes de cerrar la puerta; foto |
-| 4 | 12 | **Lab 4.2:** contraseñas fuertes y bloqueo por intentos; foto |
-| 4 | 8 | **Lab 4.3:** superficie: qué escucha, qué se cierra, parches solos; foto |
-| — | 0 | Reto individual — queda de tarea |
-| — | 10 | Cierre y snapshot |
-| — | 25 | Colchón (margen para imprevistos) |
+| Lab | Qué se hace |
+|---|---|
+| 1.1 | Publicar Apache a través del firewall: runtime vs permanent |
+| 1.2 | La red de administración en la zona `internal`, y un Apache que no arranca |
+| 2.1 | Modos de SELinux y cómo leer contextos |
+| 2.2 | El clásico: `mv`, 403 y `restorecon` |
+| 3.1 | Apache en el puerto 82 con `semanage port` |
+| 3.2 | La web desde una carpeta propia `/web`, y por qué `chcon` no alcanza |
+| 3.3 | Booleanos: prender y apagar partes de la política |
+| 3.4 | Leer una denegación de punta a punta, con `sealert` |
+| 4.1 | SSH solo con llaves, sin root, probado antes de cerrar la puerta |
+| 4.2 | Contraseñas fuertes y bloqueo por intentos fallidos |
+| 4.3 | Superficie: qué escucha, qué se cierra, parches solos |
+
+Cada lab termina con una sección **Solución** con todos los comandos seguidos.
+
+**Reto del día:** Ticket PGN-2026-0812 — el portal en el puerto 8082 y en `/sitio`, sin apagar nada.
+
+## Las dos rutas para ver la web desde tu computadora
+
+| Ruta | Dirección | Por dónde entra |
+|---|---|---|
+| NAT (port forwarding) | `http://localhost:8080` | zona `public`, por la interfaz |
+| Host-only | `http://192.168.56.10` | zona `internal` desde el Lab 1.2, por el origen |
+
+Si `localhost:8080` no carga nunca, es que a tu VM le falta la regla de reenvío de puertos. Con la VM **apagada**, en VirtualBox: Configuración → Red → Adaptador 1 (NAT) → Avanzado → Reenvío de puertos → **+** → Host `8080`, Invitado `80`, protocolo TCP. En UTM: Configuración → Red → Reenvío de puertos → **+**, lo mismo. La ruta host-only (`192.168.56.10`) funciona sin esa regla y sirve igual para todos los labs.
 
 ---
 
@@ -43,11 +48,17 @@ Publicar un servicio abriendo solo lo necesario, resolver un bloqueo de SELinux 
 
 ## Tarea
 
-1. **El reto** (Ticket PGN-2026-0812) si no se hizo en clase. Mandar la salida de la verificación por el chat.
+1. **El reto** (Ticket PGN-2026-0812), que junta todo lo del día en un solo ejercicio.
 
-2. **Devolver Apache al estándar** (mañana se usa en el puerto 80 con `/var/www/html`), después del reto:
+2. **Devolver Apache al estándar** (mañana se usa en el puerto 80 con `/var/www/html`), después del reto.
+
+   Primero mirar qué archivos hay:
    ```bash
-   sudo rm /etc/httpd/conf.d/puerto.conf /etc/httpd/conf.d/web.conf
+   ls /etc/httpd/conf.d/
+   ```
+   Hay que borrar **todos los que creaste hoy**: `puerto.conf`, `web.conf`, y el que hayas usado en el reto para apuntar a `/sitio` (si le pusiste otro nombre, ese también). Los que vinieron de fábrica — `autoindex.conf`, `userdir.conf`, `welcome.conf`, `README` — **no se tocan**.
+   ```bash
+   sudo rm -f /etc/httpd/conf.d/puerto.conf /etc/httpd/conf.d/web.conf
    sudo systemctl restart httpd
    curl http://localhost
    sudo firewall-cmd --permanent --remove-port=82/tcp

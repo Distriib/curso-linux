@@ -1,4 +1,4 @@
-# Lab — autofs: montar al usar
+# Lab 2.3 — autofs: montar al usar
 
 Vamos a dejar que las carpetas se monten solas cuando alguien entra, y se desmonten solas cuando nadie las usa.
 
@@ -18,8 +18,6 @@ Vamos a dejar que las carpetas se monten solas cuando alguien entra, y se desmon
 sudo dnf install -y autofs
 grep auto.master.d /etc/auto.master
 ```
-
-Todos a la vez. Foto.
 
 **Comprobar:**
 ```
@@ -42,8 +40,6 @@ Pegar:
 /remoto     /etc/auto.remoto     --timeout=60
 /-          /etc/auto.directo
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```bash
@@ -70,8 +66,6 @@ lectura       -ro         127.0.0.1:/srv/nfs/lectura
 echo "/datos/nfs    -rw,sync    192.168.56.10:/srv/nfs/compartido" | sudo tee /etc/auto.directo
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```bash
 cat /etc/auto.remoto /etc/auto.directo
@@ -91,8 +85,6 @@ ls -ld /remoto /datos/nfs
 ls /remoto
 mount | grep autofs
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -115,7 +107,7 @@ ls /remoto/compartido
 mount | grep nfs4
 ```
 
-Ahora ustedes: lo mismo, y después `cat /remoto/lectura/README.txt` y `cat /datos/nfs/prueba.txt`. Foto.
+Después, `cat /remoto/lectura/README.txt` y `cat /datos/nfs/prueba.txt`.
 
 **Comprobar:**
 ```
@@ -138,8 +130,6 @@ sleep 90
 mount | grep nfs4
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:** queda solo `/datos/nfs`. Los de `/remoto` tenían `--timeout=60` y se soltaron; el directo usa el valor por defecto, 300 segundos, y todavía sigue.
 
 ---
@@ -154,6 +144,77 @@ sudo systemctl reload autofs
 journalctl -u autofs --no-pager | tail -3
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:** `automount -m` lista cada punto de montaje con su mapa y sus entradas. `reload` relee los mapas sin cortar nada: es lo que va después de cada edición.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — instalar y leer el mapa maestro
+sudo dnf install -y autofs
+grep auto.master.d /etc/auto.master
+
+# Parte 2 — el mapa maestro del laboratorio
+sudo vim /etc/auto.master.d/lab.autofs
+```
+Contenido:
+```
+/remoto     /etc/auto.remoto     --timeout=60
+/-          /etc/auto.directo
+```
+```bash
+cat /etc/auto.master.d/lab.autofs
+
+# Parte 3 — los dos mapas
+sudo vim /etc/auto.remoto
+```
+Contenido:
+```
+compartido    -rw,sync    192.168.56.10:/srv/nfs/compartido
+lectura       -ro         127.0.0.1:/srv/nfs/lectura
+```
+```bash
+echo "/datos/nfs    -rw,sync    192.168.56.10:/srv/nfs/compartido" | sudo tee /etc/auto.directo
+cat /etc/auto.remoto /etc/auto.directo
+
+# Parte 4 — arrancar y mirar lo que creó
+sudo systemctl enable --now autofs
+systemctl is-active autofs
+ls -ld /remoto /datos/nfs
+ls /remoto                       # vacío, y está bien
+mount | grep autofs
+
+# Parte 5 — disparar los montajes (basta con entrar a la ruta)
+ls /remoto/compartido
+cat /remoto/lectura/README.txt
+cat /datos/nfs/prueba.txt
+mount | grep nfs4                # ahora sí, tres montajes
+
+# Parte 6 — se desmonta solo
+cd ~
+sleep 90
+mount | grep nfs4                # quedó solo /datos/nfs
+
+# Parte 7 — cambios y diagnóstico
+sudo automount -m | head -20
+sudo systemctl reload autofs
+journalctl -u autofs --no-pager | tail -3
+```
+
+**Tres archivos, dos niveles.** El mapa **maestro** (`/etc/auto.master.d/lab.autofs`) dice *qué carpeta vigilar* y *en qué archivo está el detalle*. Los mapas de abajo (`auto.remoto`, `auto.directo`) dicen *qué montar*.
+
+**Indirecto contra directo** — la diferencia está en la primera columna del mapa maestro:
+
+| Tipo | Mapa maestro | Mapa de abajo | Resultado |
+|---|---|---|---|
+| **Indirecto** | `/remoto` | `compartido  -rw  servidor:/ruta` | se monta en `/remoto/compartido` |
+| **Directo** | `/-` | `/datos/nfs  -rw  servidor:/ruta` | se monta en la ruta absoluta `/datos/nfs` |
+
+En el indirecto la primera columna del mapa de abajo es **una subcarpeta**; en el directo es **la ruta completa**, y por eso el maestro lleva `/-` en vez de una carpeta.
+
+**`ls /remoto` sale vacío y está bien.** Las subcarpetas no existen hasta que alguien las pide por su nombre: `ls /remoto/compartido` es lo que dispara el `mount`. Nadie ejecutó `mount` a mano.
+
+**El `--timeout` es por mapa.** `/remoto` tiene `--timeout=60` y se suelta al minuto sin uso; el directo no lo lleva y usa el valor por defecto, 300 segundos. Por eso en la Parte 6 sobrevive solo `/datos/nfs`.
+
+**Después de editar cualquier mapa: `sudo systemctl reload autofs`.** Relee los archivos sin cortar los montajes que estén en uso.

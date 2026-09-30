@@ -10,28 +10,32 @@
 
 Hasta hoy cada comando se tipeaba a mano, uno por uno. Hoy se dejan escritos en un archivo, y el servidor los ejecuta solo a la hora que le digamos.
 
-## Cómo corre el día
+## Los laboratorios del día
 
-| Bloque | Min | Qué |
-|---|---:|---|
-| 1 | 10 | **Comandos:** anatomía de un script, variables y argumentos (explicado en consola) |
-| 1 | 20 | **Lab:** primer script — yo hago el primero, ustedes los demás, foto |
-| 2 | 10 | **Comandos:** `if`, pruebas, `exit`, `bash -x`, `logger` (explicado en consola) |
-| 2 | 20 | **Lab:** un script que decide — yo hago el primero, ustedes los demás, foto |
-| 3 | 10 | **Comandos:** `for`, `while read`, funciones (explicado en consola) |
-| 3 | 15 | **Lab 1:** bucles sobre un log — yo hago el primero, ustedes los demás, foto |
-| 3 | 15 | **Lab 2:** `backup.sh` con retención — yo hago el primero, ustedes los demás, foto |
-| — | 15 | Descanso |
-| 4 | 5 | **Comandos:** scripts de administración (explicado en consola) |
-| 4 | 15 | **Lab 1:** altas de usuarios en lote — yo hago el primero, ustedes los demás, foto |
-| 4 | 15 | **Lab 2:** alerta de disco — yo hago el primero, ustedes los demás, foto |
-| 5 | 15 | **Comandos:** `cron`, `at` y temporizadores de systemd (explicado en consola) |
-| 5 | 20 | **Lab 1:** `cron` — yo hago el primero, ustedes los demás, foto |
-| 5 | 10 | **Lab 2:** `at` — yo hago el primero, ustedes los demás, foto |
-| 5 | 15 | **Lab 3:** temporizador de systemd — yo hago el primero, ustedes los demás, foto |
-| — | 0 | Reto individual — solo si sobra tiempo; si no, es tarea |
-| — | 10 | Cierre y snapshot |
-| — | 20 | Colchón (margen para imprevistos) |
+| Lab | Qué se hace |
+|---|---|
+| 1.1 | Primer script: `hola.sh`, `args.sh` y `reporte.sh` en `~/bin` |
+| 2.1 | `revisar.sh`: un script que decide y devuelve códigos de salida |
+| 3.1 | Bucles `for` y `while read` sobre un log |
+| 3.2 | `backup.sh`: comprimir con fecha y borrar los respaldos viejos |
+| 4.1 | Altas de usuarios en lote desde un archivo de texto |
+| 4.2 | `monitor-disco.sh`: alerta cuando un disco pasa el umbral |
+| 5.1 | `cron`: la trampa del `PATH` y el crontab definitivo |
+| 5.2 | `at`: una tarea que corre una sola vez |
+| 5.3 | Temporizador de systemd para `monitor-disco.sh` |
+
+Cada lab termina con una sección **Solución** con todos los comandos. Mirarla después de intentarlo.
+
+**Reto del día:** Ticket PGN-1187 — `limpiar-logs.sh`, programado por `cron` y por un temporizador de systemd.
+
+## Dónde queda cada cosa
+
+| Carpeta | Qué se deja ahí |
+|---|---|
+| `~/bin` | `hola.sh`, `args.sh`, `reporte.sh`, `revisar.sh`, `backup.sh`, `crear-usuarios.sh` |
+| `/usr/local/bin` | `monitor-disco.sh` (lo ejecuta systemd como root) |
+| `/datos/backups` | los respaldos que genera `backup.sh` |
+| `/etc/systemd/system` | `monitor-disco.service` y `monitor-disco.timer` |
 
 ---
 

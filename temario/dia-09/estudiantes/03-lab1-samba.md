@@ -1,4 +1,4 @@
-# Lab — Carpeta compartida con Samba
+# Lab 3.1 — Carpeta compartida con Samba
 
 Vamos a compartir `/srv/samba/compartido` con el grupo `sistemas`, entrar como `ana` desde Linux y desde Windows.
 
@@ -19,8 +19,6 @@ sudo dnf install -y samba samba-client cifs-utils
 id ana
 echo 'Pgn.2026' | sudo passwd --stdin ana
 ```
-
-Todos a la vez. Foto.
 
 **Comprobar:**
 ```
@@ -43,8 +41,6 @@ sudo semanage fcontext -a -t samba_share_t "/srv/samba(/.*)?"
 sudo restorecon -Rv /srv/samba
 ls -ldZ /srv/samba/compartido
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -86,8 +82,6 @@ Pegar:
 testparm -s
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 Load smb config files from /etc/samba/smb.conf
@@ -123,8 +117,6 @@ sudo firewall-cmd --reload
 sudo ss -tlnp | grep smbd
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 Added user ana.
@@ -159,8 +151,6 @@ exit
 ls -l /srv/samba/compartido/
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 	Sharename       Type      Comment
@@ -192,8 +182,6 @@ ls -l /mnt/smb/ /srv/samba/compartido/
 sudo umount /mnt/smb
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 //localhost/compartido on /mnt/smb type cifs (rw,relatime,vers=3.1.1,...,username=ana,uid=1000,...,gid=3001,...)
@@ -219,3 +207,100 @@ En tu computadora: `Win+R`, escribir `\\192.168.56.10\compartido`, Enter. Usuari
 ls -l /srv/samba/compartido/
 ```
 El archivo creado desde Windows aparece como `ana sistemas`.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — paquetes y usuario
+sudo dnf install -y samba samba-client cifs-utils
+id ana
+echo 'Pgn.2026' | sudo passwd --stdin ana
+
+# Parte 2 — la carpeta y su etiqueta SELinux
+sudo mkdir -p /srv/samba/compartido
+sudo chown root:sistemas /srv/samba/compartido
+sudo chmod 2775 /srv/samba/compartido
+sudo semanage fcontext -a -t samba_share_t "/srv/samba(/.*)?"
+sudo restorecon -Rv /srv/samba
+ls -ldZ /srv/samba/compartido
+
+# Parte 3 — smb.conf
+sudo mv /etc/samba/smb.conf /etc/samba/smb.conf.orig
+sudo vim /etc/samba/smb.conf
+```
+Contenido:
+```
+[global]
+    workgroup = PGN
+    server string = Servidor de archivos rhel01
+    security = user
+    map to guest = Never
+    log file = /var/log/samba/log.%m
+    max log size = 50
+
+[compartido]
+    comment = Carpeta compartida del grupo sistemas
+    path = /srv/samba/compartido
+    valid users = @sistemas
+    writable = yes
+    browseable = yes
+    create mask = 0664
+    directory mask = 2775
+```
+```bash
+testparm -s
+
+# Parte 4 — contraseña Samba, servicios y firewall
+sudo smbpasswd -a ana          # Pgn.2026 dos veces
+sudo pdbedit -L
+sudo systemctl enable --now smb nmb
+systemctl is-active smb nmb
+sudo firewall-cmd --add-service=samba --permanent
+sudo firewall-cmd --zone=internal --add-service=samba --permanent
+sudo firewall-cmd --reload
+sudo ss -tlnp | grep smbd
+
+# Parte 5 — entrar con smbclient
+smbclient -L localhost -U ana
+smbclient //localhost/compartido -U ana
+```
+Adentro del prompt `smb: \>`:
+```
+ls
+put /etc/hostname hostname.txt
+ls
+exit
+```
+```bash
+ls -l /srv/samba/compartido/
+
+# Parte 6 — montarla como una carpeta más
+sudo mkdir -p /mnt/smb
+sudo mount -t cifs //localhost/compartido /mnt/smb -o username=ana,uid=student,gid=sistemas
+mount | grep cifs
+touch /mnt/smb/desde-cifs.txt
+ls -l /mnt/smb/ /srv/samba/compartido/
+sudo umount /mnt/smb
+
+# Parte 7 — desde Windows: Win+R -> \\192.168.56.10\compartido
+#            usuario ana, clave Pgn.2026, y crear un archivo adentro
+ls -l /srv/samba/compartido/
+```
+
+**Dos contraseñas para el mismo usuario.** Samba guarda las suyas aparte, en su propia base (`pdbedit -L`), porque usa un formato de hash distinto al de `/etc/shadow`. Por eso además del `passwd` hace falta el `smbpasswd -a`. Si alguien cambia la de Linux, la de Samba **no** cambia sola.
+
+**Las tres cosas que tienen que estar bien a la vez**, y cada una falla distinto:
+
+| Capa | Qué se hizo | Si falta |
+|---|---|---|
+| Permisos Linux | `chown root:sistemas`, `chmod 2775` | entra pero no puede escribir |
+| SELinux | `samba_share_t` sobre `/srv/samba` | entra y ve la carpeta vacía o da error de acceso |
+| Firewall | servicio `samba` en las dos zonas | no conecta desde afuera |
+
+**El `2` de `2775` es setgid:** todo lo que se cree adentro hereda el grupo `sistemas`, sin importar quién lo escriba. Junto con `create mask = 0664`, eso es lo que hace que el grupo entero pueda trabajar sobre los mismos archivos.
+
+**Quién figura como dueño depende de dónde mires.** En `/mnt/smb` los archivos salen de `student` porque así se montó (`uid=student`); en `/srv/samba/compartido` salen de `ana`, que es quien realmente se autenticó. El montaje CIFS solo disfraza los dueños del lado del cliente.
+
+**`Unable to connect with SMB1`** al final de `smbclient -L` es normal: SMB1 está apagado por inseguro.

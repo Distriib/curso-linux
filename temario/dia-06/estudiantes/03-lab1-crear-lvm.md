@@ -1,6 +1,6 @@
 # Lab 3.1 — Crear un volumen LVM y montarlo
 
-Vamos a construir `vg_datos` sobre `sdb3`, cortar `lv_datos` de 1 GiB con XFS y dejarlo montado en `/datos` de forma permanente. Todos tipean cada comando; cuando dice **Ahora ustedes**, lo hacen solos. Foto de cada parte. En UTM: `vdb3`.
+Vamos a construir `vg_datos` sobre `sdb3`, cortar `lv_datos` de 1 GiB con XFS y dejarlo montado en `/datos` de forma permanente. Foto de cada parte. Donde dice **Ahora ustedes**, el comando no está escrito: hay que resolverlo. La solución está al final de la hoja. En UTM: `vdb3`.
 
 | Capa | Nombre | Tamaño |
 |---|---|---|
@@ -153,3 +153,60 @@ sdb
 └─sdb4
 ```
 `sdb3` dice `LVM2_member` y de él cuelga `vg_datos-lv_datos`. `sdb4` sigue vacío: es para el próximo lab. Foto.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — PV
+sudo pvcreate /dev/sdb3
+sudo pvs
+
+# Parte 2 — VG
+sudo vgcreate vg_datos /dev/sdb3
+sudo vgs
+sudo vgdisplay vg_datos
+
+# Parte 3 — LV
+sudo lvcreate -n lv_datos -L 1G vg_datos
+sudo lvs
+ls -l /dev/vg_datos/lv_datos /dev/mapper/vg_datos-lv_datos
+
+# Parte 4 — formatear y montar permanente
+sudo mkfs.xfs /dev/vg_datos/lv_datos
+sudo mkdir /datos
+sudo vim /etc/fstab
+```
+`G` → `o` → esta línea es **igual para todos**, no lleva UUID:
+```
+/dev/mapper/vg_datos-lv_datos  /datos  xfs  defaults  0 0
+```
+`Esc` → `:wq`
+```bash
+sudo systemctl daemon-reload
+sudo mount -a
+df -h /datos
+
+# Parte 5 — datos de prueba
+sudo mkdir -p /datos/empresa/clientes /datos/empresa/logs
+echo "Contrato 1 - PanamaTech" | sudo tee /datos/empresa/clientes/contrato_1.txt
+```
+
+**Parte 5 (Ahora ustedes)** — los otros dos contratos:
+```bash
+echo "Contrato 2 - PanamaTech" | sudo tee /datos/empresa/clientes/contrato_2.txt
+echo "Contrato 3 - PanamaTech" | sudo tee /datos/empresa/clientes/contrato_3.txt
+ls /datos/empresa/clientes/
+```
+
+```bash
+# Parte 6 — un archivo grande
+sudo dd if=/dev/zero of=/datos/empresa/logs/app.log bs=1M count=100 status=none
+sudo du -sh /datos/empresa
+df -h /datos
+
+# Parte 7 — visto desde el disco
+lsblk -f /dev/sdb
+```
+En UTM, `vdb3` y `vdb`.

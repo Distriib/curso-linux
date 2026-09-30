@@ -1,4 +1,4 @@
-# Lab — Cliente NFS y `fstab`
+# Lab 2.2 — Cliente NFS y `fstab`
 
 Vamos a montar las dos carpetas exportadas desde la misma VM, escribir en una, chocar contra la otra, y dejar una línea correcta en `/etc/fstab`.
 
@@ -18,7 +18,7 @@ sudo mkdir -p /mnt/nfs /mnt/lectura
 sudo mount -t nfs 192.168.56.10:/srv/nfs/compartido /mnt/nfs
 ```
 
-Ahora ustedes: la segunda, `127.0.0.1:/srv/nfs/lectura` en `/mnt/lectura`. Foto.
+Ahora el segundo montaje: `127.0.0.1:/srv/nfs/lectura` en `/mnt/lectura`.
 
 **Comprobar:**
 ```bash
@@ -46,7 +46,7 @@ cat /mnt/nfs/prueba.txt
 ls -l /srv/nfs/compartido/
 ```
 
-Ahora ustedes: lo mismo, y después intenten crear un archivo en `/mnt/lectura`, primero sin `sudo` y después con `sudo`. Foto.
+Después, intentar crear un archivo en `/mnt/lectura`, primero sin `sudo` y después con `sudo`.
 
 **Comprobar:**
 ```
@@ -67,8 +67,6 @@ Mismo dueño en los dos lados porque el UID es el mismo. Ni root escribe en un e
 ls -Zd /mnt/nfs
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 system_u:object_r:nfs_t:s0 /mnt/nfs
@@ -87,8 +85,6 @@ sudo systemctl daemon-reload
 sudo mount -a
 df -h /mnt/nfs
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -116,9 +112,63 @@ tail -1 /etc/fstab
 sudo systemctl daemon-reload
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 #192.168.56.10:/srv/nfs/compartido  /mnt/nfs  nfs  defaults,_netdev,nofail  0 0
 ```
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — montar a mano los dos
+sudo mkdir -p /mnt/nfs /mnt/lectura
+sudo mount -t nfs 192.168.56.10:/srv/nfs/compartido /mnt/nfs
+sudo mount -t nfs 127.0.0.1:/srv/nfs/lectura /mnt/lectura
+mount | grep nfs4
+df -hT /mnt/nfs /mnt/lectura
+
+# Parte 2 — escribir, leer, y chocar
+echo "escrito desde el cliente" > /mnt/nfs/prueba.txt
+cat /mnt/nfs/prueba.txt
+ls -l /srv/nfs/compartido/
+touch /mnt/lectura/no-se-puede.txt        # Read-only file system
+sudo touch /mnt/lectura/tampoco-root.txt  # Read-only file system, ni con sudo
+
+# Parte 3 — la etiqueta SELinux del cliente
+ls -Zd /mnt/nfs
+
+# Parte 4 — permanente con fstab
+sudo umount /mnt/nfs /mnt/lectura
+echo "192.168.56.10:/srv/nfs/compartido  /mnt/nfs  nfs  defaults,_netdev,nofail  0 0" | sudo tee -a /etc/fstab
+sudo systemctl daemon-reload
+sudo mount -a
+df -h /mnt/nfs
+
+# Parte 5 — comentar la línea (el próximo lab usa autofs)
+sudo umount /mnt/nfs
+sudo vim /etc/fstab
+```
+En la última línea, poner `#` al principio. Guardar con `:wq`.
+```bash
+tail -1 /etc/fstab
+sudo systemctl daemon-reload
+```
+
+**El servidor manda, no el cliente.** En la Parte 1 `/mnt/lectura` aparece montado con `rw` — eso es lo que **pidió** el cliente. Cuando se intenta escribir, salta `Read-only file system`, porque el servidor lo exportó `ro`. Ni con `sudo` se puede: la restricción no está en los permisos locales.
+
+**Los archivos salen con el mismo dueño en los dos lados** porque el UID de `student` es el mismo acá y allá (es la misma máquina). Entre servidores distintos, si los UID no coinciden, un archivo de `student` puede aparecer como otro usuario del otro lado. Eso es lo que resuelven LDAP o idmapd.
+
+**Las dos opciones que salvan el arranque:**
+
+| Opción | Qué hace |
+|---|---|
+| `_netdev` | esperá a que haya red antes de montar |
+| `nofail` | si el servidor no responde, seguí arrancando igual |
+
+Sin ellas, un servidor NFS caído deja la VM colgada 90 segundos y después en modo de emergencia. Y **siempre `mount -a` antes de reiniciar**: un error en `fstab` se ve ahora y no en el próximo arranque.
+
+**`nfs_t`** es la etiqueta con la que el cliente ve todo lo montado por NFS, sin importar qué etiqueta tenga del lado del servidor.
+
+**Se comenta la línea, no se borra,** porque el próximo lab monta lo mismo con autofs y dos mecanismos peleando por el mismo punto de montaje dan errores raros.

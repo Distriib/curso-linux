@@ -13,8 +13,6 @@ getsebool -a | grep -c httpd
 getsebool httpd_can_network_connect httpd_enable_homedirs
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 45
@@ -32,8 +30,6 @@ El número puede variar un poco. Los dos que importan hoy están apagados.
 ```bash
 sudo semanage boolean -l | grep httpd_can_network_connect
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -54,7 +50,7 @@ getsebool httpd_can_network_connect
 sudo semanage boolean -l -C
 ```
 
-Ahora ustedes: lo mismo (el primero tarda unos segundos). Foto.
+(El primer comando tarda unos segundos.)
 
 **Comprobar:**
 ```
@@ -74,6 +70,32 @@ sudo setsebool -P httpd_can_network_connect off
 getsebool httpd_can_network_connect
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:** `httpd_can_network_connect --> off`. Hoy no hay proxy inverso; prender interruptores "por si acaso" agranda la superficie de ataque.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — cuántos interruptores tiene Apache
+getsebool -a | grep -c httpd
+getsebool httpd_can_network_connect httpd_enable_homedirs
+
+# Parte 2 — verlo con su descripción
+sudo semanage boolean -l | grep httpd_can_network_connect
+
+# Parte 3 — prenderlo persistente (tarda unos segundos)
+sudo setsebool -P httpd_can_network_connect on
+getsebool httpd_can_network_connect
+sudo semanage boolean -l -C
+
+# Parte 4 — apagarlo otra vez
+sudo setsebool -P httpd_can_network_connect off
+getsebool httpd_can_network_connect
+```
+
+**El `-P` es lo que importa.** Sin `-P` el cambio se pierde al reiniciar, y es el clásico "funcionaba y después del reinicio dejó de funcionar". Con `-P` se escribe en la política y sobrevive.
+
+Los dos valores entre paréntesis de `semanage boolean -l` son `(ahora, al arrancar)`: si no coinciden, alguien lo cambió sin `-P`.
+
+Un booleano es la respuesta correcta cuando el AVC dice que el servicio quiere hacer algo **legítimo pero apagado por defecto** — típicamente salir a la red (`{ name_connect }`) o leer los `home` de los usuarios. No es la respuesta para una etiqueta mal puesta.

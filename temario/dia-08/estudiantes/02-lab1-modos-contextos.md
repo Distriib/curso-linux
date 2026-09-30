@@ -13,8 +13,6 @@ getenforce
 sestatus
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 Enforcing
@@ -40,8 +38,6 @@ curl -I http://localhost:82
 sudo ausearch -m AVC -ts recent | tail -1
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 Permissive
@@ -66,8 +62,6 @@ systemctl is-active httpd
 grep -v "#" /etc/selinux/config
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 Job for httpd.service failed ...
@@ -90,8 +84,6 @@ ls -Z /var/www/html/
 ls -Zd /root /home/student /etc/shadow /var/www/html /tmp
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
@@ -104,3 +96,38 @@ system_u:object_r:httpd_sys_content_t:s0 /var/www/html
 system_u:object_r:tmp_t:s0 /tmp
 ```
 El primer campo (`system_u` / `unconfined_u`) varía según quién creó el archivo; lo que decide es el **tipo**. Tu shell es `unconfined_t`: SELinux no te limita a vos, limita a los servicios.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — en qué modo estamos
+getenforce
+sestatus
+
+# Parte 2 — la prueba del permissive
+sudo setenforce 0
+getenforce
+sudo systemctl restart httpd     # ahora SÍ arranca en el 82
+curl -I http://localhost:82
+sudo ausearch -m AVC -ts recent | tail -1
+
+# Parte 3 — volver a enforcing y dejar Apache sano
+sudo setenforce 1
+sudo systemctl restart httpd     # vuelve a fallar: era SELinux
+sudo rm /etc/httpd/conf.d/puerto.conf
+sudo systemctl restart httpd     # sin el Listen 82, arranca en el 80
+systemctl is-active httpd
+grep -v "#" /etc/selinux/config
+
+# Parte 4 — leer etiquetas
+id -Z
+ps -eZ | grep httpd
+ls -Z /var/www/html/
+ls -Zd /root /home/student /etc/shadow /var/www/html /tmp
+```
+
+**La prueba del permissive** es para **diagnosticar**, no para arreglar: se pone permissive unos segundos, se confirma que era SELinux, y se vuelve a `enforcing` **antes** de corregir. La denegación queda registrada igual (`permissive=1` en el AVC), que es justamente lo que sirve.
+
+El puerto 82 se arregla **bien** en el Lab 3.1, con `semanage`. Dejar `setenforce 0` sería tapar el problema.

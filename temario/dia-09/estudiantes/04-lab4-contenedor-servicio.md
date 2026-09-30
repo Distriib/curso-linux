@@ -1,4 +1,4 @@
-# Lab — El contenedor como servicio
+# Lab 4.4 — El contenedor como servicio
 
 Vamos a hacer que el servidor web en contenedor arranque con el sistema, sin que nadie inicie sesión, manejado por systemd.
 
@@ -18,8 +18,6 @@ Vamos a hacer que el servidor web en contenedor arranque con el sistema, sin que
 podman rm -f web web2
 podman ps -a
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:** queda solo `miweb`, `Up ...`. `web` usaba el 8080 que va a usar el servicio, y `web2` tenía `:Z` sobre la misma carpeta `~/web`: dos `:Z` sobre la misma carpeta se pisan la etiqueta.
 
@@ -53,8 +51,6 @@ WantedBy=default.target
 /usr/libexec/podman/quadlet -dryrun -user
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:** imprime el servicio completo que va a generar. Importan estas líneas:
 ```
 SourcePath=/home/student/.config/containers/systemd/web.container
@@ -78,8 +74,6 @@ systemctl --user status web.service --no-pager | head -6
 podman ps
 curl http://localhost:8080/
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -109,8 +103,6 @@ loginctl show-user student | grep Linger
 ls /var/lib/systemd/linger/
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 Linger=no
@@ -137,8 +129,6 @@ systemctl --user enable --now container-miweb.service
 systemctl --user is-active container-miweb.service
 podman ps
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -167,6 +157,92 @@ systemctl --user is-active web.service container-miweb.service
 podman ps
 ```
 
-Todos a la vez. Foto.
-
 **Comprobar:** las dos páginas cargan sin que nadie haya iniciado sesión. Después, `active` dos veces, y `podman ps` con `systemd-web` y `miweb`.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — limpiar los contenedores que estorban
+podman rm -f web web2
+podman ps -a                     # queda solo miweb
+
+# Parte 2 — el archivo Quadlet
+mkdir -p ~/.config/containers/systemd
+vim ~/.config/containers/systemd/web.container
+```
+Contenido:
+```
+[Unit]
+Description=Servidor web intranet en contenedor (Quadlet)
+
+[Container]
+Image=registry.access.redhat.com/ubi9/httpd-24
+PublishPort=8080:8080
+Volume=/home/student/web:/var/www/html:Z
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+```
+```bash
+/usr/libexec/podman/quadlet -dryrun -user    # muestra el .service que va a generar
+
+# Parte 3 — arrancar el servicio
+systemctl --user daemon-reload
+systemctl --user start web.service
+systemctl --user enable web.service          # da error, y es esperado
+systemctl --user status web.service --no-pager | head -6
+podman ps
+curl http://localhost:8080/
+
+# Parte 4 — arrancar sin que nadie inicie sesión
+loginctl show-user student | grep Linger     # Linger=no
+sudo loginctl enable-linger student
+loginctl show-user student | grep Linger     # Linger=yes
+ls /var/lib/systemd/linger/
+
+# Parte 5 — la forma vieja, para reconocerla
+cd ~
+podman generate systemd --new --files --name miweb
+mkdir -p ~/.config/systemd/user
+mv container-miweb.service ~/.config/systemd/user/
+grep ExecStart ~/.config/systemd/user/container-miweb.service
+podman rm -f miweb
+systemctl --user daemon-reload
+systemctl --user enable --now container-miweb.service
+systemctl --user is-active container-miweb.service
+podman ps
+
+# Parte 6 — la prueba de verdad
+sudo reboot
+```
+Esperar un minuto. **Antes de conectarse por SSH**, abrir en el navegador `http://192.168.56.10:8080/` y `http://192.168.56.10:8083/`. Después entrar y comprobar:
+```bash
+systemctl --user is-active web.service container-miweb.service
+podman ps
+```
+
+**Quadlet: se escribe un `.container`, systemd genera el `.service`.** El archivo va en `~/.config/containers/systemd/` y systemd lo convierte en `web.service` cada vez que arranca. El servicio generado no existe como archivo permanente — vive en `/run/user/1000/systemd/generator/`.
+
+**Por eso `systemctl --user enable` da error** (`Unit ... is transient or generated`) y **no importa**: el bloque `[Install] WantedBy=default.target` del `.container` ya deja el servicio habilitado. Se opera normal con `systemctl --user start|stop|restart web.service`.
+
+**Siempre `--user`.** Estos servicios son del usuario `student`, no del sistema. Sin `--user`, systemd los busca en `/etc/systemd/system` y no los encuentra.
+
+**El *linger* es la pieza que casi nadie recuerda.** Sin él, los servicios de usuario arrancan cuando `student` inicia sesión y **mueren cuando cierra la última**. Un servidor que se reinicia de madrugada quedaría con el contenedor caído hasta que alguien entrara por SSH. `loginctl enable-linger student` hace que systemd mantenga vivo su espacio aunque no haya ninguna sesión — y esa es la única razón por la que la Parte 6 funciona.
+
+**Las dos formas, comparadas:**
+
+| | Quadlet (`.container`) | `podman generate systemd` |
+|---|---|---|
+| Qué se escribe | un archivo corto y declarativo | se genera un `.service` largo |
+| Si cambia algo | se edita el `.container` y `daemon-reload` | hay que regenerar el archivo |
+| `enable` | da error (ya viene habilitado por `[Install]`) | funciona normal |
+| Estado | **es lo recomendado hoy** | marcado como `DEPRECATED` |
+
+El aviso `DEPRECATED command` que imprime la Parte 5 es correcto y esperado: está en el material para que lo reconozcas si te lo encontrás en un servidor viejo, no para que lo uses.
+
+**El `--new` de la Parte 5** hace que el servicio **cree** el contenedor en cada arranque en vez de intentar arrancar uno existente. Por eso se puede borrar `miweb` antes y el servicio lo vuelve a crear solo.

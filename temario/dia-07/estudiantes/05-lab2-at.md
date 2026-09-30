@@ -1,6 +1,6 @@
-# Lab 2 — `at`
+# Lab 5.2 — `at`
 
-Vamos a programar algo para dentro de dos minutos, algo para las 17:30, y borrar lo que no queremos.
+Vamos a programar algo para dentro de dos minutos, algo para las 17:30, y borrar lo que no queremos. Donde dice **Ahora ustedes**, el comando no está escrito: hay que resolverlo y mandar foto. La solución está al final de la hoja.
 
 ---
 
@@ -81,3 +81,44 @@ sudo journalctl -t at-demo -n 1 --no-pager
 Trabajo at ejecutado: Tue Sep 16 11:02:00 AM EST 2026
 Sep 16 11:02:00 rhel01 at-demo[7001]: trabajo de at ejecutado por student
 ```
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — instalar y activar
+rpm -q at || sudo dnf install -y at
+sudo systemctl enable --now atd
+systemctl is-active atd
+
+# Parte 2 — un trabajo para dentro de dos minutos
+at now + 2 minutes
+```
+Se abre el prompt `at>`. Escribir estas dos líneas y cerrar con `Ctrl+D`:
+```
+echo "Trabajo at ejecutado: $(date)" >> /home/student/at-prueba.txt
+logger -t at-demo "trabajo de at ejecutado por $USER"
+```
+
+```bash
+# Parte 3 — en una línea, listar y borrar
+echo "logger -t at-demo 'recordatorio de las 17:30'" | at 17:30
+atq
+atrm 2
+atq
+```
+
+**Parte 3 (Ahora ustedes)** — un trabajo para dentro de 5 minutos, en una sola línea:
+```bash
+echo "date >> /home/student/at-mio.txt" | at now + 5 minutes
+atq
+```
+El número de trabajo que les toque va a ser distinto (`3`, `4`...): `at` no reutiliza los números de los que ya borraron.
+
+```bash
+# Parte 4 — cuando pasen los dos minutos
+cat ~/at-prueba.txt
+sudo journalctl -t at-demo -n 1 --no-pager
+```
+`$(date)` y `$USER` **no** se resuelven al escribirlos: `at` guarda las líneas tal cual y las ejecuta después, así que la fecha que queda es la del momento en que corrió.

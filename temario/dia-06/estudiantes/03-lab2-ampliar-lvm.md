@@ -1,6 +1,6 @@
 # Lab 3.2 — Ampliar en caliente
 
-El ticket: "`/datos` se va a quedar sin espacio. Hay que darle 1 GiB más **sin desmontar** y sin ventana de mantenimiento." Todos tipean cada comando; foto de cada parte. En UTM: `vdb4`.
+El ticket: "`/datos` se va a quedar sin espacio. Hay que darle 1 GiB más **sin desmontar** y sin ventana de mantenimiento." Foto de cada parte. En este lab van todos los comandos escritos; la solución completa está igual al final de la hoja. En UTM: `vdb4`.
 
 ---
 
@@ -106,3 +106,36 @@ sudo pvs
   /dev/sdb4  vg_datos lvm2 a--   <2.00g  1.99g
 ```
 `lv_datos` cuelga de `sdb3` **y** de `sdb4`: sus extents están repartidos en los dos. Eso es lo que una partición común no puede hacer. Foto.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — sumar sdb4 al grupo
+sudo pvcreate /dev/sdb4
+sudo vgextend vg_datos /dev/sdb4
+sudo vgs vg_datos
+sudo pvs
+
+# Parte 2 — ampliar OLVIDANDO -r (a propósito)
+sudo lvextend -L +512M /dev/vg_datos/lv_datos
+sudo lvs vg_datos
+df -h /datos                    # sigue en 1014M: el error número uno
+
+# Parte 3 — arreglarlo
+sudo xfs_growfs /datos
+df -h /datos                    # ahora sí, 1.5G
+
+# Parte 4 — bien hecho, en un solo paso
+sudo lvextend -L +512M -r /dev/vg_datos/lv_datos
+df -h /datos
+sudo lvs vg_datos
+sudo vgs vg_datos
+ls /datos/empresa/clientes/
+
+# Parte 5 — de qué particiones está hecho /datos
+lsblk -f /dev/sdb
+sudo pvs
+```
+Nada se desmontó en todo el lab. Quedan `1.99g` libres en el VG: se usan en el reto. En UTM, `vdb4` y `vdb`.

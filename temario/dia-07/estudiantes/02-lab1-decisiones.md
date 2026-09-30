@@ -1,6 +1,6 @@
-# Lab — Un script que decide
+# Lab 2.1 — Un script que decide
 
-Vamos a escribir `revisar.sh`: recibe una ruta y dice si es una carpeta, un archivo o nada, con un código de salida distinto en cada caso.
+Vamos a escribir `revisar.sh`: recibe una ruta y dice si es una carpeta, un archivo o nada, con un código de salida distinto en cada caso. Donde dice **Ahora ustedes**, el comando no está escrito: hay que resolverlo y mandar foto. La solución está al final de la hoja.
 
 | Caso | Mensaje | Código |
 |---|---|---|
@@ -162,4 +162,88 @@ sudo journalctl -t revisar -n 1 --no-pager
 **Comprobar:**
 ```
 Sep 16 ... rhel01 revisar[...]: Prueba de logger por student
+```
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — el script
+cat > ~/bin/revisar.sh <<'EOF'
+#!/bin/bash
+# revisar.sh - dice qué es una ruta: carpeta, archivo o nada
+# Uso:    revisar.sh RUTA
+# Salida: 0 ok · 1 falta el argumento · 2 la ruta no existe
+if [[ $# -ne 1 ]]; then
+    echo "Uso: $0 RUTA" >&2
+    exit 1
+fi
+
+RUTA="$1"
+
+if [[ -d "$RUTA" ]]; then
+    echo "$RUTA es una carpeta con $(ls -A "$RUTA" | wc -l) elementos"
+elif [[ -f "$RUTA" ]]; then
+    echo "$RUTA es un archivo de $(stat -c %s "$RUTA") bytes"
+    [[ -x "$RUTA" ]] && echo "  y es ejecutable"
+else
+    echo "ERROR: $RUTA no existe" >&2
+    exit 2
+fi
+EOF
+chmod +x ~/bin/revisar.sh
+bash -n ~/bin/revisar.sh && echo "sintaxis ok"
+
+# Parte 2 — probarlo
+revisar.sh /etc
+revisar.sh /etc/hostname
+revisar.sh ~/bin/hola.sh
+```
+
+**Parte 2 (Ahora ustedes)** — las tres rutas que pedía:
+```bash
+revisar.sh /home
+revisar.sh /etc/passwd
+revisar.sh /usr/bin/ls
+```
+`/usr/bin/ls` es el único de los tres que además dice `y es ejecutable`.
+
+```bash
+# Parte 3 — los errores y sus códigos
+revisar.sh /nada; echo "código: $?"
+revisar.sh; echo "código: $?"
+revisar.sh /nada 2> /dev/null; echo "código: $?"
+
+# Parte 4 — set -e
+cat > /tmp/sin-set.sh <<'EOF'
+#!/bin/bash
+echo "Antes del error"
+cat /noexiste
+echo "Después del error (se ejecuta igual)"
+EOF
+cat > /tmp/con-set.sh <<'EOF'
+#!/bin/bash
+set -e
+echo "Antes del error"
+cat /noexiste
+echo "Después del error (NO se ejecuta)"
+EOF
+bash /tmp/sin-set.sh; echo "código: $?"
+bash /tmp/con-set.sh; echo "código: $?"
+
+# Parte 5 — ver el script paso a paso
+bash -x ~/bin/revisar.sh /etc/hostname
+```
+
+**Parte 5 (Ahora ustedes)** — el mismo `bash -x` con una ruta que no existe:
+```bash
+bash -x ~/bin/revisar.sh /nada
+```
+Se ve cómo el `if` prueba `-d`, prueba `-f`, las dos fallan, y cae en el `else` con `exit 2`.
+
+```bash
+# Parte 6 — dejar rastro
+logger -t revisar "Prueba de logger por $USER"
+sudo journalctl -t revisar -n 1 --no-pager
 ```

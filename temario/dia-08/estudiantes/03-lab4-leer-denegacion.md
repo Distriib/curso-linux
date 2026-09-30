@@ -14,8 +14,6 @@ sudo mv /root/config.txt /web/
 curl -I http://localhost:82/config.txt
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:** `HTTP/1.1 403 Forbidden`.
 
 ---
@@ -27,8 +25,6 @@ Ahora ustedes: lo mismo. Foto.
 ```bash
 sudo ausearch -m AVC -ts recent | tail -1
 ```
-
-Ahora ustedes: lo mismo. Foto.
 
 **Comprobar:**
 ```
@@ -51,7 +47,7 @@ Copiar el código largo del final de la línea (lo que sigue a `sealert -l`) y p
 sudo sealert -l CODIGO
 ```
 
-Ahora ustedes: lo mismo, cada uno con su código. Foto.
+Cada uno con su propio código.
 
 **Comprobar:**
 ```
@@ -83,8 +79,6 @@ sudo restorecon -v /web/config.txt
 curl http://localhost:82/config.txt
 ```
 
-Ahora ustedes: lo mismo. Foto.
-
 **Comprobar:**
 ```
 Relabeled /web/config.txt from unconfined_u:object_r:admin_home_t:s0 to unconfined_u:object_r:httpd_sys_content_t:s0
@@ -104,7 +98,7 @@ getenforce
 sudo semanage permissive -d httpd_t
 ```
 
-Ahora ustedes: lo mismo (el primero tarda unos segundos). Foto.
+(El primer comando tarda unos segundos.)
 
 **Comprobar:**
 ```
@@ -117,3 +111,43 @@ Builtin Permissive Types
 Enforcing
 ```
 El sistema sigue en `Enforcing`; solo `httpd_t` dejaba de ser bloqueado (y seguía registrando). El resto de los servicios, protegidos. Se quita con `-d` cuando se resolvió.
+
+---
+
+# Solución — todos los comandos
+
+```bash
+# Parte 1 — provocar el problema
+echo "parametros internos del portal" | sudo tee /root/config.txt
+sudo mv /root/config.txt /web/
+curl -I http://localhost:82/config.txt        # 403 Forbidden
+
+# Parte 2 — el AVC crudo
+sudo ausearch -m AVC -ts recent | tail -1
+
+# Parte 3 — la versión traducida
+sudo journalctl -t setroubleshoot --since "5 min ago" --no-pager
+```
+De esa salida, copiar el código largo que sigue a `sealert -l` (es distinto en cada VM) y pedir el informe:
+```bash
+sudo sealert -l EL-CODIGO-QUE-TE-SALIO
+```
+```bash
+# Parte 4 — corregir y verificar
+sudo restorecon -v /web/config.txt
+curl http://localhost:82/config.txt
+
+# Parte 5 — permissive para un solo servicio (el primero tarda unos segundos)
+sudo semanage permissive -a httpd_t
+sudo semanage permissive -l
+getenforce                                    # sigue diciendo Enforcing
+sudo semanage permissive -d httpd_t
+```
+
+**El método, siempre igual:** síntoma → `ausearch` → mirar `tcontext` → decidir con la tabla → corregir → verificar con el mismo comando que falló.
+
+**De todo el AVC, el campo que resuelve el caso es `tcontext`:** dice qué etiqueta tenía la cosa que el servicio quiso tocar. Acá decía `admin_home_t` dentro de `/web` — un archivo venido de `/root`, etiqueta mal → `restorecon`.
+
+**Sobre `sealert`:** las sugerencias vienen ordenadas por confianza. La de ~99 % suele ser la correcta. La de `catchall` con `audit2allow` **aparece siempre** y casi nunca es la buena: acá le habría dado a Apache permiso permanente para leer archivos de `/root`.
+
+**`semanage permissive -a httpd_t`** es la alternativa profesional a `setenforce 0`: deja de bloquear **un solo** servicio mientras se investiga, sin desproteger el resto del sistema. Se quita con `-d` en cuanto se resolvió — y el reto de hoy verifica que no quede ninguno puesto.
